@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PlayerDock } from "./player-dock";
 import {
   Coffee,
   LogIn,
@@ -13,14 +14,13 @@ import {
   UserRound,
 } from "lucide-react";
 import clsx from "clsx";
-import { PlayerDock } from "@/components/player-dock";
 import { PlaylistBoard } from "@/components/playlist-board";
 import { LoginModal } from "@/components/login-modal";
 import { UploadModal } from "@/components/upload-modal";
 import { CategoryManager } from "@/components/category-manager";
 import { AdminPanel } from "@/components/admin-panel";
 import { Button, Toaster, inputClass, type Toast } from "@/components/ui";
-import { useAudioPlayer } from "@/hooks/use-audio-player";
+import { useAudioPlayerContext } from "@/contexts/audio-player-context";
 import { api, getStoredToken, setStoredToken } from "@/lib/client-api";
 import { accentClasses, formatDurationLong } from "@/lib/format";
 import type {
@@ -84,8 +84,8 @@ export function CafeApp({
     );
   }, [songs, query]);
 
-  const player = useAudioPlayer(songs);
   const activeCategory = categories.find((category) => category.id === activeCategoryId);
+  const audioPlayer = useAudioPlayerContext();
 
   const refreshCategories = useCallback(async () => {
     try {
@@ -143,6 +143,15 @@ export function CafeApp({
   );
 
   const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    audioPlayer.setQueue(songs);
+  }, [audioPlayer, songs]);
+
+  useEffect(() => {
+    audioPlayer.setCategoryName(activeCategory?.name ?? "Library");
+  }, [audioPlayer, activeCategory]);
+
   useEffect(() => {
     if (!hydrated) {
       setHydrated(true);
@@ -378,28 +387,17 @@ export function CafeApp({
 
         <PlaylistBoard
           songs={visibleSongs}
-          currentSongId={player.state.currentSong?.id ?? null}
-          isPlaying={player.state.isPlaying}
+          currentSongId={audioPlayer.state.currentSong?.id ?? null}
+          isPlaying={audioPlayer.state.isPlaying}
           user={user}
           loading={loadingSongs}
-          onSelect={(song) => player.toggle(song)}
+          onSelect={(song) => audioPlayer.toggle(song)}
           onReorder={(ordered) => void handleReorder(ordered)}
           onDelete={(song) => void handleDelete(song)}
         />
       </main>
 
-      <PlayerDock
-        state={player.state}
-        onToggle={() => player.toggle()}
-        onNext={player.next}
-        onPrevious={player.previous}
-        onSeek={player.seek}
-        onVolume={player.setVolume}
-        onToggleMute={player.toggleMute}
-        onToggleShuffle={player.toggleShuffle}
-        onCycleRepeat={player.cycleRepeat}
-        categoryName={activeCategory?.name ?? "Library"}
-      />
+      
 
       <LoginModal
         open={loginOpen}

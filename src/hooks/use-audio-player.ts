@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { SongDTO } from "@/lib/types";
 
 export type RepeatMode = "OFF" | "ALL" | "ONE";
@@ -29,9 +29,12 @@ export type PlayerState = {
   queue: SongDTO[];
 };
 
-export function useAudioPlayer(playlist: SongDTO[]) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+export function useAudioPlayer(
+  initialPlaylist: SongDTO[],
+  audioRef: RefObject<HTMLAudioElement | null>,
+) {
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const [queue, setQueueState] = useState<SongDTO[]>(initialPlaylist);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -43,23 +46,32 @@ export function useAudioPlayer(playlist: SongDTO[]) {
   const [error, setError] = useState<string | null>(null);
   const [shuffleOrder, setShuffleOrder] = useState<string[]>([]);
 
-  const playlistRef = useRef(playlist);
-  playlistRef.current = playlist;
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
+  const currentSongRef = useRef<SongDTO | null>(null);
 
-  const currentSong = useMemo(
-    () => playlist.find((song) => song.id === currentId) ?? null,
-    [playlist, currentId],
-  );
-
-  // Lazily create a single <audio> element for the whole session.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!audioRef.current) {
-      const audio = new Audio();
-      audio.preload = "metadata";
-      audioRef.current = audio;
+  const currentSong = useMemo(() => {
+    const fromQueue = queue.find((song) => song.id === currentId);
+    if (fromQueue) {
+      return fromQueue;
     }
+    if (currentId && currentSongRef.current?.id === currentId) {
+      return currentSongRef.current;
+    }
+    return null;
+  }, [queue, currentId]);
+
+  const setQueue = useCallback((songs: SongDTO[]) => {
+    setQueueState(songs);
+  }, []);
+
+  useEffect(() => {
+    if (queue !== initialPlaylist) return;
+  }, [initialPlaylist, queue]);
+
+  useEffect(() => {
     const audio = audioRef.current;
+    if (!audio) return;
 
     const onTime = () => setCurrentTime(audio.currentTime);
     const onLoaded = () => {
@@ -96,22 +108,21 @@ export function useAudioPlayer(playlist: SongDTO[]) {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("error", onErr);
     };
-  }, []);
+  }, [audioRef]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = muted ? 0 : volume;
     audio.muted = muted;
-  }, [volume, muted]);
+  }, [audioRef, volume, muted]);
 
-  // Rebuild the shuffle bag whenever shuffle turns on or the playlist changes.
   useEffect(() => {
     if (!shuffle) {
       setShuffleOrder([]);
       return;
     }
-    const ids = playlist.map((song) => song.id);
+    const ids = queue.map((song) => song.id);
     const shuffled = fisherYates(ids);
     if (currentId && shuffled.includes(currentId)) {
       setShuffleOrder([currentId, ...shuffled.filter((id) => id !== currentId)]);
@@ -119,43 +130,47 @@ export function useAudioPlayer(playlist: SongDTO[]) {
       setShuffleOrder(shuffled);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shuffle, playlist.map((s) => s.id).join("|")]);
+  }, [shuffle, queue.map((s) => s.id).join("|")]);
 
   const orderedIds = useMemo(() => {
     if (shuffle && shuffleOrder.length > 0) {
-      const valid = new Set(playlist.map((song) => song.id));
+      const valid = new Set(queue.map((song) => song.id));
       return shuffleOrder.filter((id) => valid.has(id));
     }
-    return playlist.map((song) => song.id);
-  }, [shuffle, shuffleOrder, playlist]);
+    return queue.map((song) => song.id);
+  }, [shuffle, shuffleOrder, queue]);
 
-  const loadAndPlay = useCallback(async (song: SongDTO, autoplay = true) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.dataset.songId !== song.id) {
-      audio.src = song.url;
-      audio.dataset.songId = song.id;
-      audio.load();
-      setCurrentTime(0);
-      setDuration(song.duration || 0);
-    }
-    setCurrentId(song.id);
-    setError(null);
-    if (!autoplay) return;
-    try {
-      setIsBuffering(true);
-      await audio.play();
-    } catch (err) {
-      setIsBuffering(false);
-      if ((err as DOMException)?.name !== "AbortError") {
-        setError("Tap play to start audio (browser autoplay policy).");
+  const loadAndPlay = useCallback(
+    async (song: SongDTO, autoplay = true) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      if (audio.dataset.songId !== song.id) {
+        audio.src = song.url;
+        audio.dataset.songId = song.id;
+        audio.load();
+        setCurrentTime(0);
+        setDuration(song.duration || 0);
       }
-    }
-  }, []);
+      setCurrentId(song.id);
+      currentSongRef.current = song;
+      setError(null);
+      if (!autoplay) return;
+      try {
+        setIsBuffering(true);
+        await audio.play();
+      } catch (err) {
+        setIsBuffering(false);
+        if ((err as DOMException)?.name !== "AbortError") {
+          setError("Tap play to start audio (browser autoplay policy).");
+        }
+      }
+    },
+    [audioRef],
+  );
 
   const play = useCallback(
     (song?: SongDTO) => {
-      const target = song ?? currentSong ?? playlistRef.current[0] ?? null;
+      const target = song ?? currentSong ?? queueRef.current[0] ?? null;
       if (!target) return;
       void loadAndPlay(target, true);
     },
@@ -165,7 +180,7 @@ export function useAudioPlayer(playlist: SongDTO[]) {
   const pause = useCallback(() => {
     audioRef.current?.pause();
     setIsPlaying(false);
-  }, []);
+  }, [audioRef]);
 
   const toggle = useCallback(
     (song?: SongDTO) => {
@@ -181,7 +196,7 @@ export function useAudioPlayer(playlist: SongDTO[]) {
         pause();
       }
     },
-    [currentId, loadAndPlay, pause, play],
+    [currentId, loadAndPlay, pause, play, audioRef],
   );
 
   const step = useCallback(
@@ -191,7 +206,7 @@ export function useAudioPlayer(playlist: SongDTO[]) {
       const index = currentId ? ids.indexOf(currentId) : -1;
 
       if (!userInitiated && repeat === "ONE" && currentId) {
-        const same = playlistRef.current.find((song) => song.id === currentId);
+        const same = queueRef.current.find((song) => song.id === currentId);
         if (same) {
           const audio = audioRef.current;
           if (audio) {
@@ -213,10 +228,10 @@ export function useAudioPlayer(playlist: SongDTO[]) {
       if (nextIndex < 0) nextIndex = ids.length - 1;
 
       const nextId = ids[nextIndex];
-      const nextSong = playlistRef.current.find((song) => song.id === nextId);
+      const nextSong = queueRef.current.find((song) => song.id === nextId);
       if (nextSong) void loadAndPlay(nextSong, true);
     },
-    [currentId, loadAndPlay, orderedIds, pause, repeat],
+    [currentId, loadAndPlay, orderedIds, pause, repeat, audioRef],
   );
 
   const next = useCallback(() => step(1, true), [step]);
@@ -227,24 +242,26 @@ export function useAudioPlayer(playlist: SongDTO[]) {
       return;
     }
     step(-1, true);
-  }, [step]);
+  }, [step, audioRef]);
 
-  // Auto-advance handling depends on the latest repeat/shuffle state.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     const onEnded = () => step(1, false);
     audio.addEventListener("ended", onEnded);
     return () => audio.removeEventListener("ended", onEnded);
-  }, [step]);
+  }, [audioRef, step]);
 
-  const seek = useCallback((seconds: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const safe = Math.max(0, Math.min(seconds, audio.duration || seconds));
-    audio.currentTime = safe;
-    setCurrentTime(safe);
-  }, []);
+  const seek = useCallback(
+    (seconds: number) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      const safe = Math.max(0, Math.min(seconds, audio.duration || seconds));
+      audio.currentTime = safe;
+      setCurrentTime(safe);
+    },
+    [audioRef],
+  );
 
   const setVolume = useCallback((value: number) => {
     const clamped = Math.max(0, Math.min(1, value));
@@ -259,22 +276,6 @@ export function useAudioPlayer(playlist: SongDTO[]) {
     [],
   );
 
-  // If the active song disappears (deleted / category switch), stop cleanly.
-  useEffect(() => {
-    if (currentId && !playlist.some((song) => song.id === currentId)) {
-      const audio = audioRef.current;
-      if (audio && audio.dataset.songId === currentId) {
-        audio.pause();
-        audio.removeAttribute("src");
-        delete audio.dataset.songId;
-      }
-      setCurrentId(null);
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setDuration(0);
-    }
-  }, [playlist, currentId]);
-
   const state: PlayerState = {
     currentSong,
     isPlaying,
@@ -286,7 +287,7 @@ export function useAudioPlayer(playlist: SongDTO[]) {
     repeat,
     isBuffering,
     error,
-    queue: playlist,
+    queue,
   };
 
   return {
@@ -301,5 +302,6 @@ export function useAudioPlayer(playlist: SongDTO[]) {
     toggleMute,
     toggleShuffle,
     cycleRepeat,
+    setQueue,
   };
 }
