@@ -157,7 +157,13 @@ export function useAudioPlayer(
       if (!autoplay) return;
       try {
         setIsBuffering(true);
-        await audio.play();
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            console.warn("Playback interrupted or blocked by browser policy:", error);
+          });
+          await playPromise;
+        }
       } catch (err) {
         setIsBuffering(false);
         if ((err as DOMException)?.name !== "AbortError") {
@@ -168,14 +174,31 @@ export function useAudioPlayer(
     [audioRef],
   );
 
-  const play = useCallback(
+  const playTrack = useCallback(
     (song?: SongDTO) => {
-      const target = song ?? currentSong ?? queueRef.current[0] ?? null;
-      if (!target) return;
-      void loadAndPlay(target, true);
+      if (!song || song.id === currentId) return;
+      void loadAndPlay(song, true);
     },
-    [currentSong, loadAndPlay],
+    [currentId, loadAndPlay],
   );
+
+  const togglePlay = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
+
+    if (!audio.paused) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => setIsPlaying(true)).catch((err) => {
+        console.warn("Playback error:", err);
+      });
+    }
+  }, [audioRef, currentSong]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -184,19 +207,15 @@ export function useAudioPlayer(
 
   const toggle = useCallback(
     (song?: SongDTO) => {
-      const audio = audioRef.current;
-      if (!audio) return;
       if (song && song.id !== currentId) {
-        void loadAndPlay(song, true);
+        playTrack(song);
         return;
       }
-      if (audio.paused) {
-        play();
-      } else {
-        pause();
+      if (currentSong) {
+        togglePlay();
       }
     },
-    [currentId, loadAndPlay, pause, play, audioRef],
+    [currentId, currentSong, playTrack, togglePlay],
   );
 
   const step = useCallback(
@@ -292,9 +311,10 @@ export function useAudioPlayer(
 
   return {
     state,
-    play,
+    playTrack,
     pause,
     toggle,
+    togglePlay,
     next,
     previous,
     seek,

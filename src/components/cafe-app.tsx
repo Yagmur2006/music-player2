@@ -145,8 +145,9 @@ export function CafeApp({
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    if (audioPlayer.state.queue.length > 0) return;
     audioPlayer.setQueue(songs);
-  }, [audioPlayer, songs]);
+  }, [audioPlayer, audioPlayer.state.queue.length, songs]);
 
   useEffect(() => {
     audioPlayer.setCategoryName(activeCategory?.name ?? "Library");
@@ -391,7 +392,13 @@ export function CafeApp({
           isPlaying={audioPlayer.state.isPlaying}
           user={user}
           loading={loadingSongs}
-          onSelect={(song) => audioPlayer.toggle(song)}
+          onSelect={(song) => {
+            const queueIds = new Set(audioPlayer.state.queue.map((item) => item.id));
+            if (!queueIds.has(song.id)) {
+              audioPlayer.setQueue(songs);
+            }
+            audioPlayer.toggle(song);
+          }}
           onReorder={(ordered) => void handleReorder(ordered)}
           onDelete={(song) => void handleDelete(song)}
         />

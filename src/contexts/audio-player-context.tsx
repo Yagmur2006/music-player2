@@ -14,6 +14,7 @@ type AudioPlayerContextValue = {
   playTrack: (song?: SongDTO) => void;
   pauseTrack: () => void;
   toggle: (song?: SongDTO) => void;
+  togglePlay: () => void;
   next: () => void;
   previous: () => void;
   seek: (seconds: number) => void;
@@ -35,11 +36,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       state: player.state,
-      play: player.play,
+      play: player.playTrack,
       pause: player.pause,
-      playTrack: player.play,
+      playTrack: player.playTrack,
       pauseTrack: player.pause,
       toggle: player.toggle,
+      togglePlay: player.togglePlay,
       next: player.next,
       previous: player.previous,
       seek: player.seek,
@@ -59,7 +61,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       <audio ref={audioRef} preload="metadata" className="hidden" />
       <PlayerDock
         state={player.state}
-        onToggle={player.toggle}
+        onToggle={player.togglePlay}
         onNext={player.next}
         onPrevious={player.previous}
         onSeek={player.seek}
