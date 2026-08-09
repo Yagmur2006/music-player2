@@ -393,11 +393,16 @@ export function CafeApp({
           user={user}
           loading={loadingSongs}
           onSelect={(song) => {
+            if (song.id === audioPlayer.state.currentSong?.id) {
+              audioPlayer.togglePlay();
+              return;
+            }
+
             const queueIds = new Set(audioPlayer.state.queue.map((item) => item.id));
             if (!queueIds.has(song.id)) {
               audioPlayer.setQueue(songs);
             }
-            audioPlayer.toggle(song);
+            audioPlayer.playTrack(song);
           }}
           onReorder={(ordered) => void handleReorder(ordered)}
           onDelete={(song) => void handleDelete(song)}
