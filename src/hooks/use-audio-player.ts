@@ -49,6 +49,7 @@ export function useAudioPlayer(
   const queueRef = useRef(queue);
   queueRef.current = queue;
   const currentSongRef = useRef<SongDTO | null>(null);
+  const playAttemptRef = useRef(0);
 
   const currentSong = useMemo(() => {
     const fromQueue = queue.find((song) => song.id === currentId);
@@ -151,21 +152,39 @@ export function useAudioPlayer(
         setCurrentTime(0);
         setDuration(song.duration || 0);
       }
-      setCurrentId(song.id);
-      currentSongRef.current = song;
-      setError(null);
-      if (!autoplay) return;
+      // Do not mutate currentId/currentSong until playback actually starts.
+      if (!autoplay) {
+        // Keep src loaded but do not mark as active yet.
+        return;
+      }
+
+      const attempt = ++playAttemptRef.current;
       try {
         setIsBuffering(true);
         const playPromise = audio.play();
         if (playPromise !== undefined) {
-          playPromise.catch((error) => {
-            console.warn("Playback interrupted or blocked by browser policy:", error);
-          });
+          // If the play promise rejects it will be handled below.
           await playPromise;
         }
-      } catch (err) {
+
+        // If another play attempt started after this one, abort committing state.
+        if (playAttemptRef.current !== attempt) {
+          // A newer play was requested; don't override the active track state.
+          return;
+        }
+
+        setCurrentId(song.id);
+        currentSongRef.current = song;
+        setError(null);
         setIsBuffering(false);
+        setIsPlaying(true);
+      } catch (err) {
+        // Ensure audio is stopped and do not auto-advance the index.
+        try {
+          audio.pause();
+        } catch {}
+        setIsBuffering(false);
+        setIsPlaying(false);
         if ((err as DOMException)?.name !== "AbortError") {
           setError("Tap play to start audio (browser autoplay policy).");
         }
@@ -177,6 +196,8 @@ export function useAudioPlayer(
   const playTrack = useCallback(
     (song?: SongDTO) => {
       if (!song || song.id === currentId) return;
+      // Cancel any pending automated transitions or previous play attempts.
+      playAttemptRef.current += 1;
       void loadAndPlay(song, true);
     },
     [currentId, loadAndPlay],
@@ -192,11 +213,27 @@ export function useAudioPlayer(
       return;
     }
 
+    // Starting playback from an already-loaded source: ensure state is only
+    // updated when play actually begins, and keep play attempts cancelable.
+    const attempt = ++playAttemptRef.current;
     const playPromise = audio.play();
     if (playPromise !== undefined) {
-      playPromise.then(() => setIsPlaying(true)).catch((err) => {
-        console.warn("Playback error:", err);
-      });
+      playPromise
+        .then(() => {
+          if (playAttemptRef.current !== attempt) return;
+          setIsPlaying(true);
+          setError(null);
+          // If currentId wasn't set (e.g. autoplay blocked earlier), sync it
+          // with the actually loaded source.
+          if (!currentId && audio.dataset.songId) {
+            setCurrentId(audio.dataset.songId);
+            // currentSongRef can't be reconstructed here reliably; leave it
+            // to other code paths that set it on successful load+play.
+          }
+        })
+        .catch((err) => {
+          console.warn("Playback error:", err);
+        });
     }
   }, [audioRef, currentSong]);
 
@@ -222,7 +259,11 @@ export function useAudioPlayer(
     (direction: 1 | -1, userInitiated = true) => {
       const ids = orderedIds;
       if (ids.length === 0) return;
-      const index = currentId ? ids.indexOf(currentId) : -1;
+      // Use the actual audio element's loaded source id first to avoid
+      // index drift when state hasn't been committed yet.
+      const audio = audioRef.current;
+      const activeId = audio?.dataset.songId ?? currentId ?? currentSongRef.current?.id ?? null;
+      const index = activeId ? ids.indexOf(activeId) : -1;
 
       if (!userInitiated && repeat === "ONE" && currentId) {
         const same = queueRef.current.find((song) => song.id === currentId);
@@ -248,7 +289,11 @@ export function useAudioPlayer(
 
       const nextId = ids[nextIndex];
       const nextSong = queueRef.current.find((song) => song.id === nextId);
-      if (nextSong) void loadAndPlay(nextSong, true);
+      if (nextSong) {
+        // Cancel any concurrent play attempts before auto-advancing.
+        if (userInitiated) playAttemptRef.current += 1;
+        void loadAndPlay(nextSong, true);
+      }
     },
     [currentId, loadAndPlay, orderedIds, pause, repeat, audioRef],
   );
@@ -260,13 +305,19 @@ export function useAudioPlayer(
       audio.currentTime = 0;
       return;
     }
+    // Cancel pending automated transitions when user explicitly moves.
+    playAttemptRef.current += 1;
     step(-1, true);
   }, [step, audioRef]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onEnded = () => step(1, false);
+    const onEnded = () => {
+      // When the element naturally ends, advance using the live audio dataset
+      // to compute the next track and start it.
+      step(1, false);
+    };
     audio.addEventListener("ended", onEnded);
     return () => audio.removeEventListener("ended", onEnded);
   }, [audioRef, step]);
