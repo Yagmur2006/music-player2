@@ -186,7 +186,12 @@ export function useAudioPlayer(
         setIsBuffering(false);
         setIsPlaying(false);
         if ((err as DOMException)?.name !== "AbortError") {
-          setError("Tap play to start audio (browser autoplay policy).");
+            console.error("REAL AUDIO PLAY ERROR:", err);
+
+            setError(
+              `Audio error: ${(err as DOMException)?.name || "Unknown"}`
+            );
+
         }
       }
     },
