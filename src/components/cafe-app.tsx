@@ -23,7 +23,7 @@ import { Button, Toaster, inputClass, type Toast } from "@/components/ui";
 import { useAudioPlayerContext } from "@/contexts/audio-player-context";
 import { api, getStoredToken, setStoredToken } from "@/lib/client-api";
 import { accentClasses, formatDurationLong } from "@/lib/format";
-import { fa } from "@/lib/i18n";
+import { en } from "@/lib/i18n";
 import { fisherYates } from "@/hooks/use-audio-player";
 import type {
   CategoryDTO,
@@ -97,17 +97,24 @@ export function CafeApp({
         setActiveCategoryId(next[0].id);
       }
     } catch (error) {
-      notify(error instanceof Error ? error.message : fa.couldNotLoadPlaylists, "error");
+      notify(error instanceof Error ? error.message : en.couldNotLoadPlaylists, "error");
     }
   }, [activeCategoryId, notify]);
 
   const lastKnownSongCountRef = useRef(initialSongs.length);
+  /**
+   * True while the visible list is in a locally shuffled order. The background poll
+   * respects this so a shuffle is never silently reverted to the stored DB order.
+   * Cleared when the user switches playlist or explicitly reloads the list.
+   */
+  const shuffledRef = useRef(false);
 
   const loadSongs = useCallback(
     async (categoryId: string, silent = false) => {
       if (!categoryId) {
         setSongs([]);
         lastKnownSongCountRef.current = 0;
+        shuffledRef.current = false;
         return;
       }
       if (!silent) {
@@ -117,8 +124,9 @@ export function CafeApp({
         const nextSongs = await api.songs(categoryId);
         setSongs(nextSongs);
         lastKnownSongCountRef.current = nextSongs.length;
+        shuffledRef.current = false;
       } catch (error) {
-        notify(error instanceof Error ? error.message : fa.couldNotLoadTracks, "error");
+        notify(error instanceof Error ? error.message : en.couldNotLoadTracks, "error");
       } finally {
         if (!silent) {
           setLoadingSongs(false);
@@ -128,17 +136,31 @@ export function CafeApp({
     [notify],
   );
 
+  /**
+   * Background poll that picks up tracks added elsewhere (Telegram bot, another admin).
+   *
+   * Two things matter here:
+   *  - Compare the playlist's OWN count, not the library-wide total. The old code
+   *    compared `stats.songCount` (whole library) against the current playlist length,
+   *    so as soon as a second playlist held any track the condition was permanently
+   *    true and the list was silently refetched every 5 s.
+   *  - Never refetch while the user is looking at a locally shuffled order, otherwise
+   *    that refetch overwrites the shuffle with the stored DB order a few seconds later.
+   */
   const refreshSongsIfNeeded = useCallback(
     async (categoryId: string) => {
       if (!categoryId) return;
+      if (shuffledRef.current) return;
 
       try {
         const snapshot = await api.songsSnapshot(categoryId);
-        const hasNewData = snapshot.stats.songCount > lastKnownSongCountRef.current;
-        if (!hasNewData) return;
+        const remoteCount =
+          snapshot.categoryStats?.songCount ?? snapshot.songs.length;
+        if (remoteCount === lastKnownSongCountRef.current) return;
+        if (shuffledRef.current) return; // user shuffled while the request was in flight
         await loadSongs(categoryId, true);
       } catch (error) {
-        notify(error instanceof Error ? error.message : fa.couldNotCheckUpdates, "error");
+        notify(error instanceof Error ? error.message : en.couldNotCheckUpdates, "error");
       }
     },
     [loadSongs, notify],
@@ -190,20 +212,21 @@ export function CafeApp({
   }, [initialUser]);
 
   /**
-   * Header "پخش تصادفی": reshuffles the visible playlist and the playback queue for
+   * Header "Shuffle" button: reshuffles the visible playlist and the playback queue for
    * this browser only. Nothing is written to the database, so it works for guests and
    * never disturbs the order other people (or the Telegram bot) see.
    */
   const handleShuffleAll = useCallback(() => {
     if (songs.length < 2) {
-      notify(fa.shuffleNeedsTracks, "info");
+      notify(en.shuffleNeedsTracks, "info");
       return;
     }
     const shuffled = fisherYates(songs);
+    shuffledRef.current = true;
     setSongs(shuffled);
     audioPlayer.setQueue(shuffled);
     setQuery("");
-    notify(fa.shuffleDone, "success");
+    notify(en.shuffleDone, "success");
   }, [songs, audioPlayer, notify]);
 
   const handleReorder = async (ordered: SongDTO[]) => {
@@ -215,23 +238,29 @@ export function CafeApp({
         activeCategoryId,
         withOrder.map((song) => ({ id: song.id, order: song.order })),
       );
-      notify(fa.orderSaved, "success");
+      shuffledRef.current = false;
+      notify(en.orderSaved, "success");
     } catch (error) {
       setSongs(previous);
-      notify(error instanceof Error ? error.message : fa.reorderFailed, "error");
+      notify(error instanceof Error ? error.message : en.reorderFailed, "error");
     }
   };
 
   const handleDelete = async (song: SongDTO) => {
     const previous = songs;
+    const previousCount = lastKnownSongCountRef.current;
     setSongs((prev) => prev.filter((entry) => entry.id !== song.id));
+    // Keep the polled baseline in step with the optimistic update, otherwise the
+    // next poll sees a mismatch and refetches (which would drop a local shuffle).
+    lastKnownSongCountRef.current = Math.max(0, previousCount - 1);
     try {
       await api.deleteSong(song.id);
-      notify(fa.removed(song.title), "success");
+      notify(en.removed(song.title), "success");
       void refreshCategories();
     } catch (error) {
       setSongs(previous);
-      notify(error instanceof Error ? error.message : fa.deleteFailed, "error");
+      lastKnownSongCountRef.current = previousCount;
+      notify(error instanceof Error ? error.message : en.deleteFailed, "error");
     }
   };
 
@@ -239,9 +268,9 @@ export function CafeApp({
     try {
       await api.logout();
       setUser(null);
-      notify(fa.signedOut, "info");
+      notify(en.signedOut, "info");
     } catch (error) {
-      notify(error instanceof Error ? error.message : fa.logoutFailed, "error");
+      notify(error instanceof Error ? error.message : en.logoutFailed, "error");
     }
   };
 
@@ -260,7 +289,7 @@ export function CafeApp({
                 {config.cafeName}
               </h1>
               <p className="truncate text-[11px] text-white/40">
-                {fa.appTagline(totalTracks, categories.length)}
+                {en.appTagline(totalTracks, categories.length)}
               </p>
             </div>
           </div>
@@ -270,16 +299,16 @@ export function CafeApp({
               variant="ghost"
               onClick={handleShuffleAll}
               className="!px-3"
-              title={fa.shuffleAllTitle}
+              title={en.shuffleAllTitle}
             >
               <Shuffle className="h-4 w-4" />
-              <span className="hidden md:inline">{fa.shuffleAll}</span>
+              <span className="hidden md:inline">{en.shuffleAll}</span>
             </Button>
 
             {canUpload ? (
               <Button onClick={() => setUploadOpen(true)} className="!px-3 sm:!px-4">
                 <UploadCloud className="h-4 w-4" />
-                <span className="hidden sm:inline">{fa.upload}</span>
+                <span className="hidden sm:inline">{en.upload}</span>
               </Button>
             ) : null}
 
@@ -289,19 +318,19 @@ export function CafeApp({
                   variant="ghost"
                   onClick={() => setCategoryOpen(true)}
                   className="!px-3"
-                  title={fa.playlists}
+                  title={en.playlists}
                 >
                   <SlidersHorizontal className="h-4 w-4" />
-                  <span className="hidden md:inline">{fa.playlists}</span>
+                  <span className="hidden md:inline">{en.playlists}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => setAdminOpen(true)}
                   className="!px-3"
-                  title={fa.adminTitle}
+                  title={en.adminTitle}
                 >
                   <Settings2 className="h-4 w-4" />
-                  <span className="hidden md:inline">{fa.admin}</span>
+                  <span className="hidden md:inline">{en.admin}</span>
                 </Button>
               </>
             ) : null}
@@ -327,7 +356,7 @@ export function CafeApp({
                   variant="ghost"
                   onClick={() => void handleLogout()}
                   className="!px-3"
-                  title={fa.signOut}
+                  title={en.signOut}
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
@@ -335,7 +364,7 @@ export function CafeApp({
             ) : (
               <Button variant="ghost" onClick={() => setLoginOpen(true)} className="!px-3">
                 <LogIn className="h-4 w-4" />
-                <span className="hidden sm:inline">{fa.staff}</span>
+                <span className="hidden sm:inline">{en.staff}</span>
               </Button>
             )}
           </div>
@@ -373,20 +402,20 @@ export function CafeApp({
         <section className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/8 bg-gradient-to-br from-white/[0.05] to-transparent p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.2em] text-amber-300/70">
-              {fa.nowCuring}
+              {en.nowCuring}
             </p>
             <h2 className="mt-1 truncate text-2xl font-semibold tracking-tight text-cafe-ink">
-              {activeCategory?.name ?? fa.noPlaylist}
+              {activeCategory?.name ?? en.noPlaylist}
             </h2>
             <p className="mt-1 max-w-xl text-sm text-white/45">
-              {activeCategory?.description ?? fa.emptyPlaylistHint}
+              {activeCategory?.description ?? en.emptyPlaylistHint}
             </p>
             <p className="mt-2 text-xs text-white/35">
-              {fa.trackCount(
+              {en.trackCount(
                 songs.length,
                 formatDurationLong(songs.reduce((sum, song) => sum + song.duration, 0)),
               )}
-              {isAdmin ? fa.dragHint : ""}
+              {isAdmin ? en.dragHint : ""}
             </p>
           </div>
 
@@ -394,7 +423,7 @@ export function CafeApp({
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
             <input
               className={clsx(inputClass, "pl-9")}
-              placeholder={fa.searchPlaceholder}
+              placeholder={en.searchPlaceholder}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -403,15 +432,15 @@ export function CafeApp({
 
         {!user ? (
           <p className="mb-4 rounded-2xl border border-white/8 bg-black/25 px-4 py-3 text-xs text-white/45">
-            {fa.guestNotice}{" "}
+            {en.guestNotice}{" "}
             <button
               type="button"
               onClick={() => setLoginOpen(true)}
               className="text-amber-300 underline-offset-2 hover:underline"
             >
-              {fa.guestSignIn}
+              {en.guestSignIn}
             </button>
-            {fa.guestUploadHint(config.allowGuestUpload)}
+            {en.guestUploadHint(config.allowGuestUpload)}
           </p>
         ) : null}
 
@@ -445,7 +474,7 @@ export function CafeApp({
         onClose={() => setLoginOpen(false)}
         onSuccess={(nextUser) => {
           setUser(nextUser);
-          notify(fa.welcomeBack(nextUser.username), "success");
+          notify(en.welcomeBack(nextUser.username), "success");
           void refreshCategories();
         }}
       />
@@ -458,9 +487,10 @@ export function CafeApp({
         onUploaded={(song) => {
           if (song.categoryId === activeCategoryId) {
             setSongs((prev) => [...prev, song]);
+            lastKnownSongCountRef.current += 1;
           }
           void refreshCategories();
-          notify(fa.added(song.title), "success");
+          notify(en.added(song.title), "success");
         }}
       />
 

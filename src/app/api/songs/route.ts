@@ -14,5 +14,18 @@ export const GET = withErrorHandling(async (request: Request) => {
 
   const list = await listSongs(categoryId || undefined);
   if (!includeStats) return jsonOk(list);
-  return jsonOk({ songs: list, stats: await libraryStats() });
+
+  /**
+   * `stats` describes the WHOLE library (used by the dashboard totals), so it must
+   * never be compared against a single playlist's length. `categoryStats` is scoped
+   * to the requested playlist and is what the client polls to detect new tracks.
+   */
+  return jsonOk({
+    songs: list,
+    stats: await libraryStats(),
+    categoryStats: {
+      songCount: list.length,
+      totalDuration: list.reduce((sum, song) => sum + song.duration, 0),
+    },
+  });
 });

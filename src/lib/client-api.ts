@@ -169,9 +169,12 @@ export const api = {
     request<SongDTO[]>(`/api/songs?categoryId=${encodeURIComponent(categoryId)}`),
 
   songsSnapshot: (categoryId: string) =>
-    request<{ songs: SongDTO[]; stats: { songCount: number; totalDuration: number; totalBytes: number } }>(
-      `/api/songs?categoryId=${encodeURIComponent(categoryId)}&stats=1`,
-    ),
+    request<{
+      songs: SongDTO[];
+      stats: { songCount: number; totalDuration: number; totalBytes: number };
+      /** Scoped to the requested playlist — compare this against the visible list. */
+      categoryStats: { songCount: number; totalDuration: number };
+    }>(`/api/songs?categoryId=${encodeURIComponent(categoryId)}&stats=1`),
 
   reorder: (categoryId: string, songOrders: { id: string; order: number }[]) =>
     request<{ success: boolean; songs: SongDTO[] }>("/api/songs/reorder", {

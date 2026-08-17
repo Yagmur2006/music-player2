@@ -57,7 +57,7 @@ VPS install is playable immediately, offline.
 | `PUT /api/categories` | ADMIN | `{ categoryOrders: [{ id, order }] }` |
 | `PATCH /api/categories/:id` | ADMIN | rename / edit description / accent |
 | `DELETE /api/categories/:id` | ADMIN | cascade-deletes songs **and** their files on disk |
-| `GET /api/songs?categoryId=…` | public | ordered by `order ASC` (`&stats=1` adds library totals) |
+| `GET /api/songs?categoryId=…` | public | ordered by `order ASC` (`&stats=1` adds library totals **and** `categoryStats` for the requested playlist) |
 | `POST /api/songs/upload` | ADMIN, or GUEST when `allowGuestUpload` | multipart: `file`, `categoryId`, `title?`, `artist?`, `duration?` |
 | `PUT /api/songs/reorder` | ADMIN | `{ categoryId, songOrders: [{ id, order }] }` (single transaction) |
 | `PATCH /api/songs/:id` | ADMIN | rename / move to another playlist |
@@ -237,17 +237,24 @@ for admins with optimistic UI and automatic rollback if the server rejects the c
 | 3 | Start the Telegram bot from the UI instead of `npm run bot` | `src/server/telegram/runtime.ts` + `POST /api/telegram/runtime` + the button/banner in `src/components/admin-panel.tsx` |
 | 4 | Warn users who send music before the bot is connected | Standby long-poll listener in `src/server/telegram/runtime.ts`, armed at boot by `src/instrumentation.ts` |
 | 5 | Upload dialog was unscrollable behind the player dock | `src/components/player-dock.tsx` publishes `--player-dock-height`; `Modal` in `src/components/ui.tsx` reserves it as bottom padding |
-| 6 | Persian interface | `src/lib/i18n.ts` (single source of copy), `dir="rtl"`/`lang="fa"` in `src/app/layout.tsx`, RTL rules in `globals.css`, bot replies in `src/server/telegram/bot.ts` |
+| 6 | Interface language | Web UI is **English** (`src/lib/i18n.ts`, `lang="en"`), while the **Telegram bot stays Persian** (`src/server/telegram/bot.ts` + the standby reply in `src/server/telegram/runtime.ts`) |
 | 7 | No changes to the existing look & feel | Only strings, direction and the two additive controls changed. Layout, spacing, colours and component structure are untouched; numbers/media controls stay LTR on purpose. |
 
 ### Notes
 
-* **Language:** the UI is Persian with **Latin digits** (`3:41`, not `۳:۴۱`) so the
-  existing `tabular-nums` alignment in the player and playlist keeps working.
+* **Language split:** the website is English; the Telegram bot deliberately replies in
+  Persian. UI copy lives in `src/lib/i18n.ts`; bot copy lives in `src/server/telegram/`
+  and is intentionally not part of that dictionary.
+* **Shuffle is not reverted any more.** The 5 s background poll used to compare the
+  *library-wide* song count against the *current playlist's* length; with more than one
+  non-empty playlist that was permanently true, so the list was refetched every 5 s and
+  the shuffled order was overwritten by the stored DB order. `GET /api/songs?stats=1`
+  now also returns `categoryStats` (scoped to the requested playlist), the client
+  compares like with like, and the poll additionally skips refetching while the user is
+  viewing a locally shuffled order.
 * **Telegram API root:** `TELEGRAM_API_ROOT` is now honoured everywhere. It defaults to
   the project's Cloudflare Worker mirror because `api.telegram.org` is filtered on some
   networks; set it to `https://api.telegram.org` on an unfiltered one. The previous
   hard-coded value contained a trailing space, which broke request URLs.
-* **Fonts:** the Persian stack (`Vazirmatn`, `Sahel`, `IRANSans`, …) is resolved from the
-  system with no network fetch, keeping the app fully offline-capable. Install one of
-  those fonts on the client machines for the best result.
+* **Fonts:** unchanged from the original (`Inter` + system stack), resolved locally with
+  no network fetch so the app stays fully offline-capable.

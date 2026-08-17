@@ -2,8 +2,8 @@
  * Next.js server bootstrap hook.
  *
  * Arms the Telegram "standby" responder as soon as the web server starts, so a client
- * who sends music BEFORE pressing the «اتصال ربات تلگرام» button in the admin panel
- * immediately gets a Persian reply telling them to press it first.
+ * who sends music BEFORE pressing the "Connect Telegram bot" button in the admin
+ * panel immediately gets a Persian reply telling them to press it first.
  *
  * Runs only in the Node.js runtime; the edge runtime has no long-lived polling.
  */

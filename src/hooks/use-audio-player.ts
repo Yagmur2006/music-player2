@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { SongDTO } from "@/lib/types";
-import { fa } from "@/lib/i18n";
+import { en } from "@/lib/i18n";
 
 export type RepeatMode = "OFF" | "ALL" | "ONE";
 
@@ -86,7 +86,7 @@ export function useAudioPlayer(
     const onErr = () => {
       setIsBuffering(false);
       setIsPlaying(false);
-      setError(fa.playbackError);
+      setError(en.playbackError);
     };
 
     audio.addEventListener("timeupdate", onTime);
@@ -184,7 +184,7 @@ export function useAudioPlayer(
         setIsPlaying(false);
         if ((err as DOMException)?.name !== "AbortError") {
           console.error("[player] playback failed:", err);
-          setError(fa.playbackError);
+          setError(en.playbackError);
         }
       }
     },
