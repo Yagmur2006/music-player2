@@ -160,16 +160,6 @@ export const en = {
   whitelistRemoved: "Removed from whitelist",
   refresh: "Refresh bot status",
 
-  // ---- Footer ----
-  /**
-   * Author credit. Intentionally Persian (owner's request) even though the rest of
-   * the interface is English — it is a signature, not UI chrome.
-   */
-  footerMadeBy: "ساخته شده توسط",
-  footerAuthor: "yagmur2006",
-  footerAuthorUrl: "https://github.com/Yagmur2006",
-  footerAuthorTitle: "GitHub — yagmur2006",
-
   // ---- Generic ----
   loading: "Loading…",
   errorGeneric: "Something went wrong",

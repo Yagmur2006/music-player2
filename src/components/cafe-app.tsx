@@ -467,30 +467,7 @@ export function CafeApp({
         />
       </main>
 
-      {/*
-        Author credit. The player dock is fixed to the bottom, so this sits inside the
-        page's existing `pb-44` scroll area rather than being fixed itself — it scrolls
-        into view under the last track instead of colliding with the dock.
-        The Persian sentence is RTL, so it is isolated with dir="rtl" to keep the
-        Latin username rendering correctly inside the LTR page.
-      */}
-      <footer className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
-        <p
-          dir="rtl"
-          className="border-t border-white/8 pt-5 text-center text-xs text-white/35"
-        >
-          {en.footerMadeBy}{" "}
-          <a
-            href={en.footerAuthorUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={en.footerAuthorTitle}
-            className="text-amber-300 underline-offset-2 transition hover:text-amber-200 hover:underline"
-          >
-            {en.footerAuthor}
-          </a>
-        </p>
-      </footer>
+      
 
       <LoginModal
         open={loginOpen}
