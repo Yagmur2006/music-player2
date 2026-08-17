@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { SongDTO } from "@/lib/types";
+import { fa } from "@/lib/i18n";
 
 export type RepeatMode = "OFF" | "ALL" | "ONE";
 
@@ -67,10 +68,6 @@ export function useAudioPlayer(
   }, []);
 
   useEffect(() => {
-    if (queue !== initialPlaylist) return;
-  }, [initialPlaylist, queue]);
-
-  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -89,7 +86,7 @@ export function useAudioPlayer(
     const onErr = () => {
       setIsBuffering(false);
       setIsPlaying(false);
-      setError("Playback failed — the audio file may be missing on the server.");
+      setError(fa.playbackError);
     };
 
     audio.addEventListener("timeupdate", onTime);
@@ -186,12 +183,8 @@ export function useAudioPlayer(
         setIsBuffering(false);
         setIsPlaying(false);
         if ((err as DOMException)?.name !== "AbortError") {
-            console.error("REAL AUDIO PLAY ERROR:", err);
-
-            setError(
-              `Audio error: ${(err as DOMException)?.name || "Unknown"}`
-            );
-
+          console.error("[player] playback failed:", err);
+          setError(fa.playbackError);
         }
       }
     },
@@ -240,7 +233,7 @@ export function useAudioPlayer(
           console.warn("Playback error:", err);
         });
     }
-  }, [audioRef, currentSong]);
+  }, [audioRef, currentSong, currentId]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();

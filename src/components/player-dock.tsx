@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Disc3,
   ListMusic,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { formatTime } from "@/lib/format";
+import { fa } from "@/lib/i18n";
 import type { PlayerState } from "@/hooks/use-audio-player";
 
 export function PlayerDock({
@@ -44,6 +45,7 @@ export function PlayerDock({
   categoryName: string;
 }) {
   const [scrubbing, setScrubbing] = useState<number | null>(null);
+  const dockRef = useRef<HTMLDivElement | null>(null);
   const { currentSong, duration } = state;
   const displayTime = scrubbing ?? state.currentTime;
   const progress = duration > 0 ? Math.min(100, (displayTime / duration) * 100) : 0;
@@ -72,14 +74,45 @@ export function PlayerDock({
     return () => window.removeEventListener("keydown", onKey);
   }, [onToggle, onNext, onPrevious, onSeek, onToggleMute, state.currentTime]);
 
+  /**
+   * Publish the dock's real height so overlaying surfaces (modals) can reserve room
+   * for it and stay fully scrollable. Recomputed on resize because the dock reflows
+   * between the mobile (stacked) and desktop (single row) layouts.
+   */
+  useEffect(() => {
+    const node = dockRef.current;
+    if (!node) return;
+
+    const publish = () => {
+      document.documentElement.style.setProperty(
+        "--player-dock-height",
+        `${node.offsetHeight}px`,
+      );
+    };
+
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    window.addEventListener("resize", publish);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", publish);
+    };
+  }, []);
+
   const VolumeIcon = useMemo(() => {
     if (state.muted || state.volume === 0) return VolumeX;
     return state.volume < 0.5 ? Volume1 : Volume2;
   }, [state.muted, state.volume]);
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-cafe-950/85 backdrop-blur-xl">
+    <div
+      ref={dockRef}
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-cafe-950/85 backdrop-blur-xl"
+    >
       <div
+        data-ltr-track
         className="h-[3px] w-full bg-white/8"
         role="progressbar"
         aria-valuemin={0}
@@ -114,7 +147,7 @@ export function PlayerDock({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-cafe-ink">
-              {currentSong ? currentSong.title : "Nothing playing"}
+              {currentSong ? currentSong.title : fa.nothingPlaying}
             </p>
             <p className="truncate text-xs text-white/45">
               {currentSong ? (
@@ -127,7 +160,7 @@ export function PlayerDock({
                   </span>
                 </>
               ) : (
-                "Pick a track to fill the room"
+                fa.pickTrack
               )}
             </p>
           </div>
@@ -137,20 +170,20 @@ export function PlayerDock({
         <div className="flex flex-1 flex-col gap-1.5">
           <div className="flex items-center justify-center gap-1 sm:gap-2">
             <ControlButton
-              label="Shuffle"
+              label={fa.shuffle}
               active={state.shuffle}
               onClick={onToggleShuffle}
               icon={<Shuffle className="h-4 w-4" />}
             />
             <ControlButton
-              label="Previous track"
+              label={fa.previous}
               onClick={onPrevious}
               icon={<SkipBack className="h-5 w-5" />}
             />
             <button
               type="button"
               onClick={onToggle}
-              aria-label={state.isPlaying ? "Pause" : "Play"}
+              aria-label={state.isPlaying ? fa.pause : fa.play}
               className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500 text-cafe-950 shadow-lg shadow-amber-500/25 transition hover:bg-amber-400 active:scale-95"
             >
               {state.isPlaying ? (
@@ -160,12 +193,12 @@ export function PlayerDock({
               )}
             </button>
             <ControlButton
-              label="Next track"
+              label={fa.next}
               onClick={onNext}
               icon={<SkipForward className="h-5 w-5" />}
             />
             <ControlButton
-              label={`Repeat: ${state.repeat.toLowerCase()}`}
+              label={fa.repeatLabel(state.repeat)}
               active={state.repeat !== "OFF"}
               onClick={onCycleRepeat}
               icon={
@@ -188,7 +221,7 @@ export function PlayerDock({
               max={Math.max(duration, 1)}
               step={0.1}
               value={displayTime}
-              aria-label="Seek"
+              aria-label={fa.seek}
               disabled={!currentSong}
               onChange={(event) => setScrubbing(Number(event.target.value))}
               onMouseUp={(event) => {
@@ -216,7 +249,7 @@ export function PlayerDock({
           <button
             type="button"
             onClick={onToggleMute}
-            aria-label={state.muted ? "Unmute" : "Mute"}
+            aria-label={state.muted ? fa.unmute : fa.mute}
             className="rounded-lg p-2 text-white/60 transition hover:bg-white/5 hover:text-white"
           >
             <VolumeIcon className="h-4 w-4" />
@@ -227,7 +260,7 @@ export function PlayerDock({
             max={1}
             step={0.01}
             value={state.muted ? 0 : state.volume}
-            aria-label="Volume"
+            aria-label={fa.volume}
             onChange={(event) => onVolume(Number(event.target.value))}
             className="h-1.5 flex-1"
           />

@@ -27,7 +27,14 @@ export const config = {
   },
   telegram: {
     token: process.env.TELEGRAM_BOT_TOKEN ?? "",
-    apiRoot: process.env.TELEGRAM_API_ROOT ?? "https://api.telegram.org",
+    /**
+     * api.telegram.org is filtered on some networks (Iran included), so the default
+     * points at the project's own Cloudflare Worker mirror. Override with
+     * TELEGRAM_API_ROOT=https://api.telegram.org on an unfiltered network.
+     */
+    apiRoot:
+      process.env.TELEGRAM_API_ROOT ??
+      "https://telegram-proxy.yagmur-fazli99.workers.dev",
     webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "",
     botUsername: process.env.TELEGRAM_BOT_USERNAME ?? "CafeMusicSyncBot",
   },

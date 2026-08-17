@@ -12,6 +12,7 @@ import { GripVertical, ListMusic, Pause, Play, Send, Trash2 } from "lucide-react
 import clsx from "clsx";
 import { EqualizerIcon } from "@/components/ui";
 import { formatTime } from "@/lib/format";
+import { fa } from "@/lib/i18n";
 import type { SessionUserDTO, SongDTO } from "@/lib/types";
 
 export function PlaylistBoard({
@@ -67,10 +68,9 @@ export function PlaylistBoard({
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-white/12 bg-black/20 px-6 py-16 text-center">
         <ListMusic className="h-9 w-9 text-white/25" />
-        <p className="text-sm font-medium text-white/70">This playlist is empty</p>
+        <p className="text-sm font-medium text-white/70">{fa.emptyBoardTitle}</p>
         <p className="max-w-sm text-xs text-white/40">
-          Upload audio from the dashboard, or forward an MP3 to the Telegram bot and pick
-          this playlist.
+          {fa.emptyBoardHint}
         </p>
       </div>
     );
@@ -175,13 +175,13 @@ function SongRow({
       {draggable ? (
         <span
           {...(dragHandleProps ?? {})}
-          aria-label="Reorder track"
+          aria-label={fa.reorderAria}
           className="cursor-grab touch-none rounded-lg p-1.5 text-white/25 transition hover:bg-white/5 hover:text-white/70 active:cursor-grabbing"
         >
           <GripVertical className="h-4 w-4" />
         </span>
       ) : (
-        <span className="w-7 text-center text-xs tabular-nums text-white/30">
+        <span data-ltr className="w-7 text-center text-xs tabular-nums text-white/30">
           {index + 1}
         </span>
       )}
@@ -189,7 +189,7 @@ function SongRow({
       <button
         type="button"
         onClick={() => onSelect(song)}
-        aria-label={`Play ${song.title}`}
+        aria-label={fa.playAria(song.title)}
         className={clsx(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition",
           active
@@ -215,7 +215,7 @@ function SongRow({
         </p>
         <p className="truncate text-xs text-white/40">
           {song.artist}
-          {song.source === "TELEGRAM" ? " · via Telegram" : ""}
+          {song.source === "TELEGRAM" ? fa.viaTelegram : ""}
         </p>
       </button>
 
@@ -225,7 +225,7 @@ function SongRow({
 
       {active ? <EqualizerIcon active={isPlaying} /> : null}
 
-      <span className="w-10 text-right text-xs tabular-nums text-white/35">
+      <span data-ltr className="w-10 text-center text-xs tabular-nums text-white/35">
         {formatTime(song.duration)}
       </span>
 
@@ -233,7 +233,7 @@ function SongRow({
         <button
           type="button"
           onClick={() => onDelete(song)}
-          aria-label={`Delete ${song.title}`}
+          aria-label={fa.deleteAria(song.title)}
           className="rounded-lg p-2 text-white/25 opacity-0 transition hover:bg-white/5 hover:text-rose-300 focus:opacity-100 group-hover:opacity-100"
         >
           <Trash2 className="h-4 w-4" />

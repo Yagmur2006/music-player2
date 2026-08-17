@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { Button, Field, Modal, inputClass } from "@/components/ui";
 import { probeLocalDuration, uploadSong } from "@/lib/client-api";
 import { formatBytes, formatTime } from "@/lib/format";
+import { fa } from "@/lib/i18n";
 import type { CategoryDTO, SongDTO } from "@/lib/types";
 
 type QueueItem = {
@@ -105,11 +106,11 @@ export function UploadModal({
       open={open}
       onClose={close}
       wide
-      title="Add music to the cafe library"
-      subtitle="Files are stored on this server's local disk — nothing leaves the network."
+      title={fa.uploadTitle}
+      subtitle={fa.uploadSubtitle}
     >
       <div className="space-y-5">
-        <Field label="Destination playlist">
+        <Field label={fa.destinationPlaylist}>
           <select
             className={inputClass}
             value={categoryId}
@@ -149,9 +150,11 @@ export function UploadModal({
         >
           <UploadCloud className="h-8 w-8 text-amber-300" />
           <p className="text-sm font-medium text-cafe-ink">
-            Drop audio files here or tap to browse
+            {fa.dropHere} — {fa.browseFiles}
           </p>
-          <p className="text-xs text-white/40">MP3 · WAV · M4A · FLAC · OGG — up to 60 MB each</p>
+          <p className="text-xs text-white/40">
+            <span data-ltr>MP3 · WAV · M4A · FLAC · OGG</span> — حداکثر ۶۰ مگابایت
+          </p>
           <input
             ref={inputRef}
             type="file"
@@ -179,7 +182,7 @@ export function UploadModal({
                       <input
                         className={inputClass}
                         value={item.title}
-                        placeholder="Track title"
+                        placeholder={fa.title}
                         onChange={(event) =>
                           patchItem(item.id, { title: event.target.value })
                         }
@@ -187,13 +190,13 @@ export function UploadModal({
                       <input
                         className={inputClass}
                         value={item.artist}
-                        placeholder="Artist (optional)"
+                        placeholder={`${fa.artist} (اختیاری)`}
                         onChange={(event) =>
                           patchItem(item.id, { artist: event.target.value })
                         }
                       />
                     </div>
-                    <p className="truncate text-xs text-white/40">
+                    <p data-ltr className="truncate text-xs text-white/40">
                       {item.file.name} · {formatBytes(item.file.size)}
                       {item.duration > 0 ? ` · ${formatTime(item.duration)}` : ""}
                     </p>
@@ -212,12 +215,12 @@ export function UploadModal({
                       <p className="text-xs text-rose-300">{item.error}</p>
                     ) : null}
                     {item.status === "done" ? (
-                      <p className="text-xs text-emerald-300">Added to playlist ✓</p>
+                      <p className="text-xs text-emerald-300">به لیست پخش اضافه شد ✓</p>
                     ) : null}
                   </div>
                   <button
                     type="button"
-                    aria-label="Remove from queue"
+                    aria-label={fa.remove}
                     disabled={busy}
                     onClick={() =>
                       setQueue((prev) => prev.filter((entry) => entry.id !== item.id))
@@ -234,14 +237,16 @@ export function UploadModal({
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button variant="ghost" onClick={close} disabled={busy}>
-            {queue.some((item) => item.status === "done") ? "Done" : "Cancel"}
+            {queue.some((item) => item.status === "done") ? fa.close : fa.cancel}
           </Button>
           <Button
             onClick={() => void startUpload()}
             disabled={busy || pendingCount === 0 || !categoryId}
           >
             <UploadCloud className="h-4 w-4" />
-            {busy ? "Uploading…" : `Upload ${pendingCount || ""}`.trim()}
+            {busy
+              ? fa.uploading
+              : `${fa.startUpload}${pendingCount ? ` (${pendingCount})` : ""}`}
           </Button>
         </div>
       </div>

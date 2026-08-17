@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { Button, Field, Modal, inputClass } from "@/components/ui";
 import { api } from "@/lib/client-api";
 import { accentClasses, formatDurationLong } from "@/lib/format";
+import { fa } from "@/lib/i18n";
 import type { CategoryDTO } from "@/lib/types";
 
 const ACCENTS = ["amber", "emerald", "violet", "sky", "rose", "teal"];
@@ -43,9 +44,9 @@ export function CategoryManager({
       setName("");
       setDescription("");
       await onChanged();
-      notify("Playlist created", "success");
+      notify(fa.playlistCreated, "success");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Could not create playlist", "error");
+      notify(error instanceof Error ? error.message : fa.errorGeneric, "error");
     } finally {
       setBusy(false);
     }
@@ -58,9 +59,9 @@ export function CategoryManager({
       await api.updateCategory(id, { name: editName.trim() });
       setEditingId(null);
       await onChanged();
-      notify("Playlist renamed", "success");
+      notify(fa.playlistUpdated, "success");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Rename failed", "error");
+      notify(error instanceof Error ? error.message : fa.errorGeneric, "error");
     } finally {
       setBusy(false);
     }
@@ -72,9 +73,9 @@ export function CategoryManager({
       const result = await api.deleteCategory(id);
       setConfirmId(null);
       await onChanged();
-      notify(`Playlist deleted (${result.deletedSongs} tracks removed)`, "success");
+      notify(`${fa.playlistDeleted} (${result.deletedSongs} قطعه حذف شد)`, "success");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Delete failed", "error");
+      notify(error instanceof Error ? error.message : fa.deleteFailed, "error");
     } finally {
       setBusy(false);
     }
@@ -85,37 +86,37 @@ export function CategoryManager({
       open={open}
       onClose={onClose}
       wide
-      title="Manage playlists"
-      subtitle="Categories drive the tabs guests see. Deleting one removes its tracks and files."
+      title={fa.categoryTitle}
+      subtitle={fa.categorySubtitle}
     >
       <div className="space-y-6">
         <div className="space-y-3 rounded-2xl border border-white/8 bg-black/25 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Name">
+            <Field label={fa.playlistName}>
               <input
                 className={inputClass}
                 value={name}
-                placeholder="Late Night"
+                placeholder="آخر شب"
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            <Field label="Description">
+            <Field label={fa.description}>
               <input
                 className={inputClass}
                 value={description}
-                placeholder="Slow jazz after 21:00"
+                placeholder="جاز آرام بعد از ساعت ۲۱"
                 onChange={(event) => setDescription(event.target.value)}
               />
             </Field>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs uppercase tracking-wider text-white/40">Accent</span>
+            <span className="text-xs uppercase tracking-wider text-white/40">{fa.color}</span>
             {ACCENTS.map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setAccent(value)}
-                aria-label={`Accent ${value}`}
+                aria-label={`${fa.color} ${value}`}
                 className={clsx(
                   "h-7 w-7 rounded-full border transition",
                   accentClasses(value).chip,
@@ -126,7 +127,7 @@ export function CategoryManager({
           </div>
           <Button onClick={() => void create()} disabled={busy || !name.trim()}>
             <FolderPlus className="h-4 w-4" />
-            Create playlist
+            {fa.create}
           </Button>
         </div>
 
@@ -138,7 +139,10 @@ export function CategoryManager({
                 key={category.id}
                 className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/8 bg-black/25 p-3.5"
               >
-                <span className={clsx("rounded-full border px-3 py-1 text-xs", accents.chip)}>
+                <span
+                  data-ltr
+                  className={clsx("rounded-full border px-3 py-1 text-xs", accents.chip)}
+                >
                   {category.slug}
                 </span>
 
@@ -159,7 +163,8 @@ export function CategoryManager({
                       {category.name}
                     </p>
                     <p className="truncate text-xs text-white/40">
-                      {category.songCount} tracks · {formatDurationLong(category.totalDuration)}
+                      {fa.songsCount(category.songCount)} ·{" "}
+                      {formatDurationLong(category.totalDuration)}
                       {category.description ? ` · ${category.description}` : ""}
                     </p>
                   </div>
@@ -170,7 +175,7 @@ export function CategoryManager({
                     <>
                       <button
                         type="button"
-                        aria-label="Save name"
+                        aria-label={fa.save}
                         onClick={() => void rename(category.id)}
                         className="rounded-lg p-2 text-emerald-300 transition hover:bg-white/5"
                       >
@@ -178,7 +183,7 @@ export function CategoryManager({
                       </button>
                       <button
                         type="button"
-                        aria-label="Cancel rename"
+                        aria-label={fa.cancel}
                         onClick={() => setEditingId(null)}
                         className="rounded-lg p-2 text-white/40 transition hover:bg-white/5"
                       >
@@ -188,7 +193,7 @@ export function CategoryManager({
                   ) : (
                     <button
                       type="button"
-                      aria-label="Rename playlist"
+                      aria-label={fa.edit}
                       onClick={() => {
                         setEditingId(category.id);
                         setEditName(category.name);
@@ -206,12 +211,12 @@ export function CategoryManager({
                       disabled={busy}
                       className="!py-1.5 !text-xs"
                     >
-                      Confirm delete
+                      تأیید حذف
                     </Button>
                   ) : (
                     <button
                       type="button"
-                      aria-label="Delete playlist"
+                      aria-label={fa.deletePlaylist}
                       onClick={() => setConfirmId(category.id)}
                       className="rounded-lg p-2 text-white/45 transition hover:bg-white/5 hover:text-rose-300"
                     >

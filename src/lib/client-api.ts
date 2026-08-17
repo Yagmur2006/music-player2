@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  BotRuntimeDTO,
   CategoryDTO,
   SessionUserDTO,
   SongDTO,
@@ -214,6 +215,19 @@ export const api = {
   },
 
   telegramStatus: () => request<TelegramStatusDTO>("/api/telegram"),
+
+  /** Current state of the in-app bot supervisor. */
+  botRuntime: () => request<BotRuntimeDTO>("/api/telegram/runtime"),
+
+  /**
+   * Starts (or stops) the Telegram bot inside the running web server — the
+   * one-click equivalent of `npm run bot` for non-technical staff.
+   */
+  setBotRuntime: (action: "start" | "stop") =>
+    request<BotRuntimeDTO>("/api/telegram/runtime", {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    }),
 
   addTelegramContact: (telegramId: string, label: string) =>
     request<{ success: boolean; whitelist: TelegramStatusDTO["whitelist"] }>("/api/telegram", {

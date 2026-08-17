@@ -46,8 +46,17 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        /**
+         * The player dock is `position: fixed` at the bottom, so it used to cover the
+         * last rows of a tall dialog (the upload queue's buttons) with no way to scroll
+         * them into view. Reserving the measured dock height as bottom padding lets the
+         * content scroll clear of it without resizing or restyling the dialog itself.
+         */
+        style={{
+          paddingBottom: "calc(var(--player-dock-height, 7rem) + 1.5rem)",
+        }}
         className={clsx(
-          "glass animate-rise relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-t-3xl p-5 shadow-2xl sm:rounded-3xl sm:p-6",
+          "glass animate-rise relative z-10 max-h-[92vh] w-full overflow-y-auto overscroll-contain rounded-t-3xl p-5 shadow-2xl sm:rounded-3xl sm:p-6",
           wide ? "sm:max-w-3xl" : "sm:max-w-lg",
         )}
       >

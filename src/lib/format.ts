@@ -13,11 +13,11 @@ export function formatTime(seconds: number): string {
 }
 
 export function formatDurationLong(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "0 min";
+  if (!Number.isFinite(seconds) || seconds <= 0) return "۰ دقیقه";
   const mins = Math.round(seconds / 60);
-  if (mins < 60) return `${mins} min`;
+  if (mins < 60) return `${mins} دقیقه`;
   const hours = Math.floor(mins / 60);
-  return `${hours} h ${mins % 60} min`;
+  return `${hours} ساعت و ${mins % 60} دقیقه`;
 }
 
 export function formatBytes(bytes: number): string {

@@ -15,6 +15,9 @@ export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
     connectionString: databaseUrl,
+    // Same as node-postgres' default; exposed so constrained environments
+    // (e.g. an embedded/WASM Postgres used for testing) can cap connections.
+    max: Number(process.env.PGPOOL_MAX ?? 10),
   });
 
 if (process.env.NODE_ENV !== "production") {

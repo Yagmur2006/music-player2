@@ -58,3 +58,16 @@ export type ReorderPayload = {
   categoryId: string;
   songOrders: { id: string; order: number }[];
 };
+
+/** Supervisor state for the in-app Telegram bot runner (the admin-panel button). */
+export type BotMode = "OFF" | "STANDBY" | "STARTING" | "ACTIVE" | "ERROR";
+
+export type BotRuntimeDTO = {
+  mode: BotMode;
+  active: boolean;
+  standby: boolean;
+  configured: boolean;
+  botUsername: string;
+  message: string;
+  startedAt: string | null;
+};

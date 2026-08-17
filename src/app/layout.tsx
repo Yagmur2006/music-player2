@@ -4,9 +4,9 @@ import { AudioPlayerProvider } from "@/contexts/audio-player-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cafe Audio · Self-hosted music control",
+  title: "پخش موسیقی کافه · سامانهٔ محلی",
   description:
-    "Autonomous Cafe Audio Management System — local-first playlists, drag & drop ordering, range-streaming playback and Telegram ingest.",
+    "سامانهٔ خودگردان مدیریت صدای کافه — لیست‌های پخش محلی، مرتب‌سازی کشیدنی، پخش پیوسته و دریافت موسیقی از تلگرام.",
 };
 
 export const viewport: Viewport = {
@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="fa" dir="rtl" className="dark" suppressHydrationWarning>
       <body className="min-h-screen antialiased" suppressHydrationWarning>
         <AudioPlayerProvider>{children}</AudioPlayerProvider>
       </body>

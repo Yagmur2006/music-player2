@@ -4,6 +4,7 @@ import { useState } from "react";
 import { KeyRound, LogIn, ShieldCheck } from "lucide-react";
 import { Button, Field, Modal, inputClass } from "@/components/ui";
 import { api } from "@/lib/client-api";
+import { fa } from "@/lib/i18n";
 import type { SessionUserDTO } from "@/lib/types";
 
 export function LoginModal({
@@ -30,7 +31,7 @@ export function LoginModal({
       setPassword("");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : fa.loginFailed);
     } finally {
       setBusy(false);
     }
@@ -40,8 +41,8 @@ export function LoginModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Staff sign in"
-      subtitle="JWT session stored in an HttpOnly cookie — no external identity provider."
+      title={fa.loginTitle}
+      subtitle={fa.loginSubtitle}
     >
       <form
         className="space-y-4"
@@ -50,7 +51,7 @@ export function LoginModal({
           void submit();
         }}
       >
-        <Field label="Username">
+        <Field label={fa.username}>
           <input
             className={inputClass}
             value={username}
@@ -59,7 +60,7 @@ export function LoginModal({
             placeholder="admin"
           />
         </Field>
-        <Field label="Password">
+        <Field label={fa.password}>
           <input
             className={inputClass}
             type="password"
@@ -78,19 +79,21 @@ export function LoginModal({
 
         <Button type="submit" disabled={busy || !username || !password} className="w-full">
           <LogIn className="h-4 w-4" />
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? fa.signingIn : fa.signIn}
         </Button>
 
         <div className="space-y-2 rounded-2xl border border-white/8 bg-black/25 p-4 text-xs text-white/50">
           <p className="flex items-center gap-2 font-medium text-white/70">
             <ShieldCheck className="h-3.5 w-3.5 text-amber-300" />
-            Default local accounts (change them in production)
+            حساب‌های پیش‌فرض محلی (در محیط واقعی تغییر دهید)
           </p>
           <p className="flex items-center gap-2">
-            <KeyRound className="h-3.5 w-3.5" /> admin / cafe1404 — full control
+            <KeyRound className="h-3.5 w-3.5" />
+            <span data-ltr>admin / cafe1404</span> — دسترسی کامل
           </p>
           <p className="flex items-center gap-2">
-            <KeyRound className="h-3.5 w-3.5" /> barista / guest1404 — guest role
+            <KeyRound className="h-3.5 w-3.5" />
+            <span data-ltr>barista / guest1404</span> — نقش مهمان
           </p>
         </div>
       </form>

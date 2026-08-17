@@ -66,6 +66,7 @@ VPS install is playable immediately, offline.
 | `PATCH /api/config` | ADMIN | `{ allowGuestUpload?, cafeName? }` |
 | `GET /api/stream/:id` | public | audio bytes, `Accept-Ranges: bytes`, `206 Partial Content`, `416` on bad range |
 | `GET/POST/DELETE /api/telegram` | ADMIN | bot reachability probe + whitelist CRUD |
+| `GET/POST /api/telegram/runtime` | ADMIN | start/stop the bot from the UI (`{ action: "start" \| "stop" }`) — the in-app `npm run bot` |
 | `POST /api/telegram/webhook` | Telegram | webhook transport (optional secret token header) |
 | `GET /api/health` | public | DB, storage, telegram and library status |
 
@@ -136,11 +137,21 @@ the admin panel simply reports "bot disabled".
    TELEGRAM_BOT_TOKEN=8123456789:AAH2v...
    TELEGRAM_BOT_USERNAME=CafeMusicSyncBot
    ```
-3. **Start the worker** in a second terminal (or as a systemd/pm2 service):
+3. **Start the bot.** Two options:
+
+   **a) From the website (recommended — no terminal needed).**
+   Sign in as admin → **مدیریت / Admin** → *ربات همگام‌سازی تلگرام* → press
+   **«اتصال ربات تلگرام»**. The bot starts inside the running web server and the
+   panel shows a green banner on success, or a red one if the network is down.
+
+   **b) From a terminal**, as a separate long-poll worker:
    ```bash
    npm run bot
    ```
    You should see `[telegram] launching long-poll worker as @CafeMusicSyncBot`.
+
+   > Use **one** of the two at a time: Telegram allows a single `getUpdates`
+   > consumer per token.
 4. **Whitelist your staff.** Each person opens the bot and sends `/whoami`; the bot replies
    with their numeric Telegram ID. In the web app: sign in as admin → **Admin** →
    *Telegram sync bot* → paste the ID + a label → **Whitelist**.
@@ -206,8 +217,37 @@ reachable mirror.
 
 ## 7. Player features
 
-Play/pause · next/prev (prev restarts the track in the first 3 s) · continuously updating
+One-click **«پخش تصادفی»** in the header (randomises the visible playlist and the play
+queue for this browser only — nothing is written to the database, so guests can use it
+and other people's ordering is untouched) · play/pause · next/prev (prev restarts the
+track in the first 3 s) · continuously updating
 seek bar with scrub preview · volume slider + mute · Fisher–Yates shuffle bag (no repeats
 until the bag is exhausted) · repeat off/all/one · buffering + error states · keyboard
 transport (`Space`, `←/→` ±5 s, `Shift+←/→` track skip, `M` mute) · drag-and-drop reordering
 for admins with optimistic UI and automatic rollback if the server rejects the change.
+
+---
+
+## 9. What changed in this revision
+
+| # | Request | Where |
+| --- | --- | --- |
+| 1 | `.env.local` must not be tracked by Git | `.gitignore` (+ `git rm --cached`). **The previously committed bot token is in Git history — revoke it in @BotFather.** |
+| 2 | Header shuffle button | `src/components/cafe-app.tsx` (`handleShuffleAll`), reuses the existing `fisherYates` helper. Client-side only. |
+| 3 | Start the Telegram bot from the UI instead of `npm run bot` | `src/server/telegram/runtime.ts` + `POST /api/telegram/runtime` + the button/banner in `src/components/admin-panel.tsx` |
+| 4 | Warn users who send music before the bot is connected | Standby long-poll listener in `src/server/telegram/runtime.ts`, armed at boot by `src/instrumentation.ts` |
+| 5 | Upload dialog was unscrollable behind the player dock | `src/components/player-dock.tsx` publishes `--player-dock-height`; `Modal` in `src/components/ui.tsx` reserves it as bottom padding |
+| 6 | Persian interface | `src/lib/i18n.ts` (single source of copy), `dir="rtl"`/`lang="fa"` in `src/app/layout.tsx`, RTL rules in `globals.css`, bot replies in `src/server/telegram/bot.ts` |
+| 7 | No changes to the existing look & feel | Only strings, direction and the two additive controls changed. Layout, spacing, colours and component structure are untouched; numbers/media controls stay LTR on purpose. |
+
+### Notes
+
+* **Language:** the UI is Persian with **Latin digits** (`3:41`, not `۳:۴۱`) so the
+  existing `tabular-nums` alignment in the player and playlist keeps working.
+* **Telegram API root:** `TELEGRAM_API_ROOT` is now honoured everywhere. It defaults to
+  the project's Cloudflare Worker mirror because `api.telegram.org` is filtered on some
+  networks; set it to `https://api.telegram.org` on an unfiltered one. The previous
+  hard-coded value contained a trailing space, which broke request URLs.
+* **Fonts:** the Persian stack (`Vazirmatn`, `Sahel`, `IRANSans`, …) is resolved from the
+  system with no network fetch, keeping the app fully offline-capable. Install one of
+  those fonts on the client machines for the best result.

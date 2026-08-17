@@ -70,7 +70,9 @@ async function downloadTelegramFile(bot: Telegraf, fileId: string): Promise<Buff
 
 function buildBot(token: string): Telegraf {
   const bot = new Telegraf(token, {
-    telegram: { apiRoot:"https://telegram-proxy.yagmur-fazli99.workers.dev/ "},
+    // Honour TELEGRAM_API_ROOT so a local mirror/proxy can be used when
+    // api.telegram.org is blocked. Trailing slashes break URL building.
+    telegram: { apiRoot: config.telegram.apiRoot.trim().replace(/\/+$/, "") },
     handlerTimeout: 120_000,
   });
 
@@ -86,12 +88,12 @@ function buildBot(token: string): Telegraf {
     await ensureBootstrap();
     await ctx.reply(
       [
-        `☕️ Welcome to the cafe music sync bot (@${config.telegram.botUsername}).`,
+        `☕️ به ربات همگام‌سازی موسیقی کافه خوش آمدید (@${config.telegram.botUsername}).`,
         "",
-        "Send or forward an audio file (MP3/M4A/WAV/FLAC) and I will ask which",
-        "playlist it belongs to, then publish it straight to the cafe player.",
+        "یک فایل صوتی (MP3/M4A/WAV/FLAC) بفرستید یا فوروارد کنید؛ من می‌پرسم",
+        "برای کدام لیست پخش است و سپس آن را مستقیم در پخش‌کنندهٔ کافه قرار می‌دهم.",
         "",
-        "Commands: /list — playlists · /whoami — your Telegram ID · /help",
+        "دستورها: /list لیست‌های پخش · /whoami شناسهٔ شما · /help راهنما",
       ].join("\n"),
     );
   });
@@ -99,13 +101,13 @@ function buildBot(token: string): Telegraf {
   bot.help(async (ctx) => {
     await ctx.reply(
       [
-        "How to add music:",
-        "1. Send me an audio file or forward one from any chat.",
-        "2. Tap the playlist button I show you.",
-        "3. I store the file on the cafe server and add it to the end of that playlist.",
+        "روش افزودن موسیقی:",
+        "۱. یک فایل صوتی بفرستید یا از هر گفت‌وگویی فوروارد کنید.",
+        "۲. روی دکمهٔ لیست پخش موردنظر بزنید.",
+        "۳. فایل روی سرور کافه ذخیره و به انتهای همان لیست اضافه می‌شود.",
         "",
-        "If uploads are locked, ask an admin to whitelist your Telegram ID (/whoami)",
-        "or to enable guest uploads in the web dashboard.",
+        "اگر بارگذاری قفل است، از مدیر بخواهید شناسهٔ تلگرام شما (/whoami) را",
+        "به فهرست مجاز اضافه کند یا بارگذاری مهمان‌ها را در سایت فعال کند.",
       ].join("\n"),
     );
   });
@@ -115,12 +117,12 @@ function buildBot(token: string): Telegraf {
     const permission = await resolveTelegramPermission(id).catch(() => null);
     await ctx.reply(
       [
-        `Your Telegram ID: ${id}`,
+        `شناسهٔ تلگرام شما: ${id}`,
         permission
           ? permission.allowed
-            ? `Upload access: ✅ granted (${permission.reason.toLowerCase().replace(/_/g, " ")})`
-            : "Upload access: ⛔️ locked — ask an admin to whitelist you"
-          : "Upload access: unknown (database unreachable)",
+            ? "دسترسی بارگذاری: ✅ فعال"
+            : "دسترسی بارگذاری: ⛔️ قفل — از مدیر بخواهید شما را به فهرست مجاز اضافه کند"
+          : "دسترسی بارگذاری: نامشخص (پایگاه داده در دسترس نیست)",
       ].join("\n"),
     );
   });
@@ -129,11 +131,11 @@ function buildBot(token: string): Telegraf {
     await ensureBootstrap();
     const categories = await listCategoriesOrdered();
     if (categories.length === 0) {
-      await ctx.reply("No playlists exist yet. Create one in the web dashboard first.");
+      await ctx.reply("هنوز لیست پخشی ساخته نشده است. ابتدا در سایت یکی بسازید.");
       return;
     }
     await ctx.reply(
-      ["🎚 Playlists:", ...categories.map((c, i) => `${i + 1}. ${c.name} (${c.slug})`)].join(
+      ["🎚 لیست‌های پخش:", ...categories.map((c, i) => `${i + 1}. ${c.name} (${c.slug})`)].join(
         "\n",
       ),
     );
@@ -156,8 +158,8 @@ function buildBot(token: string): Telegraf {
 
     if (!permission.allowed) {
       await ctx.reply(
-        "⛔️ Uploads are currently locked. Ask a cafe admin to whitelist your ID " +
-          `(${telegramId}) or enable guest uploads in the dashboard.`,
+        "⛔️ بارگذاری در حال حاضر قفل است. از مدیر کافه بخواهید شناسهٔ شما " +
+          `(${telegramId}) را به فهرست مجاز اضافه کند یا بارگذاری مهمان‌ها را فعال کند.`,
       );
       return;
     }
@@ -168,7 +170,7 @@ function buildBot(token: string): Telegraf {
 
     const categories = await listCategoriesOrdered();
     if (categories.length === 0) {
-      await ctx.reply("No playlists exist yet. Create one in the web dashboard first.");
+      await ctx.reply("هنوز لیست پخشی ساخته نشده است. ابتدا در سایت یکی بسازید.");
       return;
     }
 
@@ -185,7 +187,7 @@ function buildBot(token: string): Telegraf {
     });
 
     await ctx.reply(
-      `🎧 "${file.title ?? fileName}" received. Which playlist should it join?`,
+      `🎧 «${file.title ?? fileName}» دریافت شد. به کدام لیست پخش اضافه شود؟`,
       Markup.inlineKeyboard(
         categories.map((category) => [
           Markup.button.callback(`▶︎ ${category.name}`, `pick:${key}:${category.id}`),
@@ -215,7 +217,7 @@ function buildBot(token: string): Telegraf {
         extensionOf(doc.file_name ?? ""),
       );
     if (!looksAudio) {
-      await ctx.reply("That file is not an audio track — send MP3, M4A, WAV, FLAC or OGG.");
+      await ctx.reply("این فایل صوتی نیست — لطفاً MP3، M4A، WAV، FLAC یا OGG بفرستید.");
       return;
     }
     await handleIncomingAudio(ctx, {
@@ -228,11 +230,11 @@ function buildBot(token: string): Telegraf {
   bot.action(/^pick:([a-f0-9]{8}):([0-9a-fA-F-]{36})$/, async (ctx) => {
     const key = ctx.match[1];
     const categoryId = ctx.match[2];
-    await ctx.answerCbQuery("Downloading…").catch(() => undefined);
+    await ctx.answerCbQuery("در حال دریافت…").catch(() => undefined);
 
     const job = pending.get(key);
     if (!job) {
-      await ctx.editMessageText("⏳ That upload expired. Please send the file again.");
+      await ctx.editMessageText("⏳ مهلت این فایل تمام شد. لطفاً دوباره ارسال کنید.");
       return;
     }
 
@@ -240,7 +242,7 @@ function buildBot(token: string): Telegraf {
       await ensureBootstrap();
       const permission = await resolveTelegramPermission(String(ctx.from?.id ?? ""));
       if (!permission.allowed) {
-        await ctx.editMessageText("⛔️ Uploads were locked before this file was saved.");
+        await ctx.editMessageText("⛔️ پیش از ذخیرهٔ این فایل، بارگذاری قفل شد.");
         pending.delete(key);
         return;
       }
@@ -262,17 +264,17 @@ function buildBot(token: string): Telegraf {
       const category = categories.find((c) => c.id === categoryId);
       await ctx.editMessageText(
         [
-          "✅ Added to the cafe player.",
+          "✅ به پخش‌کنندهٔ کافه اضافه شد.",
           `🎵 ${song.title} — ${song.artist}`,
-          `🗂 Playlist: ${category?.name ?? "Unknown"} (position #${song.order + 1})`,
-          `⏱ Duration: ${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, "0")}`,
+          `🗂 لیست پخش: ${category?.name ?? "نامشخص"} (جایگاه ${song.order + 1})`,
+          `⏱ مدت: ${Math.floor(song.duration / 60)}:${String(song.duration % 60).padStart(2, "0")}`,
         ].join("\n"),
       );
     } catch (error) {
       console.error("[telegram] upload failed:", error);
       await ctx
         .editMessageText(
-          `⚠️ Upload failed: ${error instanceof Error ? error.message : "unknown error"}`,
+          `⚠️ بارگذاری ناموفق بود: ${error instanceof Error ? error.message : "خطای نامشخص"}`,
         )
         .catch(() => undefined);
     }
@@ -280,7 +282,7 @@ function buildBot(token: string): Telegraf {
 
   bot.on(message("text"), async (ctx) => {
     if (ctx.message.text.startsWith("/")) return;
-    await ctx.reply("Send me an audio file to add it to a cafe playlist. /help for details.");
+    await ctx.reply("یک فایل صوتی بفرستید تا به لیست پخش کافه اضافه شود. /help برای راهنما.");
   });
 
   return bot;
@@ -307,7 +309,7 @@ export async function probeTelegram(timeoutMs = 4000): Promise<{
   if (!bot) {
     return {
       reachable: false,
-      message: "TELEGRAM_BOT_TOKEN is not configured — bot disabled, web app unaffected.",
+      message: "توکن ربات تلگرام تنظیم نشده است — ربات غیرفعال، سایت بدون تأثیر کار می‌کند.",
       botUsername: config.telegram.botUsername,
     };
   }
@@ -326,13 +328,13 @@ export async function probeTelegram(timeoutMs = 4000): Promise<{
     if (!payload.ok) {
       return {
         reachable: false,
-        message: payload.description ?? "Telegram rejected the token.",
+        message: payload.description ?? "تلگرام توکن را نپذیرفت.",
         botUsername: config.telegram.botUsername,
       };
     }
     return {
       reachable: true,
-      message: "Connected to Telegram API.",
+      message: "اتصال به سرویس تلگرام برقرار است.",
       botUsername: payload.result?.username ?? config.telegram.botUsername,
     };
   } catch (error) {
@@ -340,8 +342,8 @@ export async function probeTelegram(timeoutMs = 4000): Promise<{
       reachable: false,
       message:
         error instanceof Error && error.name === "AbortError"
-          ? "Telegram API unreachable (timeout). Local playback continues normally."
-          : `Telegram API unreachable: ${error instanceof Error ? error.message : "network error"}`,
+          ? "تلگرام در دسترس نیست (اتمام زمان). پخش محلی بدون مشکل ادامه دارد."
+          : `تلگرام در دسترس نیست: ${error instanceof Error ? error.message : "خطای شبکه"}`,
       botUsername: config.telegram.botUsername,
     };
   } finally {

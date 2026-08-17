@@ -7,7 +7,8 @@
   --color-cafe-800: #241d19;
   --color-cafe-700: #33281f;
   --color-cafe-ink: #f6efe6;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Vazirmatn", "Sahel", "IRANSans", "Segoe UI", Tahoma, "Noto Sans Arabic",
+    ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 html,
@@ -124,4 +125,27 @@ input[type="range"]::-moz-range-thumb {
   background: linear-gradient(180deg, rgba(36, 29, 25, 0.88) 0%, rgba(20, 16, 16, 0.92) 100%);
   backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* ---------------------------------------------------------------------------
+   RTL support.
+   The shell is dir="rtl" for Persian, but media controls and numbers must stay
+   left-to-right: a mirrored seek bar or a right-anchored progress fill would
+   change the player's behaviour, and the brief asks for the UI/UX to stay
+   exactly as it was.
+   --------------------------------------------------------------------------- */
+input[type="range"] {
+  direction: ltr;
+}
+
+/* Times, counters, byte sizes: Latin digits, always LTR, never re-ordered. */
+.tabular-nums,
+[data-ltr] {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Progress/seek fills are width-driven and must grow from the left edge. */
+[data-ltr-track] {
+  direction: ltr;
 }
