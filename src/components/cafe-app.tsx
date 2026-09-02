@@ -21,6 +21,7 @@ import { CategoryManager } from "@/components/category-manager";
 import { AdminPanel } from "@/components/admin-panel";
 import { Button, Toaster, inputClass, type Toast } from "@/components/ui";
 import { useAudioPlayerContext } from "@/contexts/audio-player-context";
+import { usePlaylistScheduler } from "@/hooks/use-playlist-scheduler";
 import { api, getStoredToken, setStoredToken } from "@/lib/client-api";
 import { accentClasses, formatDurationLong } from "@/lib/format";
 import { en } from "@/lib/i18n";
@@ -278,6 +279,64 @@ export function CafeApp({
     }
   };
 
+  /**
+   * ──────────────────────────────────────────────────────────────────────────
+   * Automatic playlist scheduling (event-driven, see src/lib/schedule-engine.ts)
+   * ──────────────────────────────────────────────────────────────────────────
+   */
+
+  /**
+   * Latest schedule controller, for use inside stable callbacks.
+   */
+  const scheduleRef = useRef<ReturnType<typeof usePlaylistScheduler> | null>(null);
+
+  const executeScheduledSwitch = useCallback(
+    async (categoryId: string) => {
+      // Safety net: if the target playlist was deleted, re-sync the schedule.
+      if (!categories.some((cat) => cat.id === categoryId)) {
+        void scheduleRef.current?.refresh();
+        return;
+      }
+
+      const targetSongs = await api.songs(categoryId).catch(() => null);
+      if (!targetSongs) return;
+
+      // If already playing from this category, do nothing.
+      if (audioPlayer.state.currentSong?.categoryId === categoryId) return;
+
+      if (targetSongs.length === 0) return;
+
+      // Change the playlist and play the first track.
+      audioPlayer.setQueue(targetSongs);
+      audioPlayer.playTrack(targetSongs[0]);
+    },
+    [audioPlayer, categories],
+  );
+
+  const handleScheduleSwitch = useCallback(
+    (categoryId: string) => {
+      void executeScheduledSwitch(categoryId);
+    },
+    [executeScheduledSwitch],
+  );
+
+  const handleScheduleRelease = useCallback(() => {
+    // Fall back to the default (first) playlist.
+    const fallbackId = categories[0]?.id;
+    if (fallbackId) {
+      void executeScheduledSwitch(fallbackId);
+    }
+  }, [categories, executeScheduledSwitch]);
+
+  const schedule = usePlaylistScheduler({
+    onSwitch: handleScheduleSwitch,
+    onRelease: handleScheduleRelease,
+  });
+
+  useEffect(() => {
+    scheduleRef.current = schedule;
+  }, [schedule]);
+
   const totalTracks = categories.reduce((sum, category) => sum + category.songCount, 0);
 
   return (
@@ -383,6 +442,7 @@ export function CafeApp({
                 <button
                   key={category.id}
                   type="button"
+                  data-category-tab={category.id}
                   onClick={() => setActiveCategoryId(category.id)}
                   className={clsx(
                     "flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
@@ -506,6 +566,9 @@ export function CafeApp({
         onChanged={async () => {
           await refreshCategories();
           await loadSongs(activeCategoryId);
+          // A deleted playlist cascades its schedule windows on the server;
+          // re-sync so the local schedule never points at a removed playlist.
+          await schedule.refresh();
         }}
       />
 
@@ -519,6 +582,8 @@ export function CafeApp({
           onUserChange={setUser}
           notify={notify}
           stats={{ songCount: totalTracks, categoryCount: categories.length }}
+          categories={categories}
+          schedule={schedule}
         />
       ) : null}
 
