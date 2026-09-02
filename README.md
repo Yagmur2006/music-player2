@@ -112,7 +112,6 @@ GUEST_USERNAME=barista
 GUEST_PASSWORD=guest1404
 TELEGRAM_BOT_TOKEN=            # empty = bot disabled, web app unaffected
 TELEGRAM_BOT_USERNAME=CafeMusicSyncBot
-TELEGRAM_API_ROOT=https://api.telegram.org
 TELEGRAM_WEBHOOK_SECRET=
 ```
 
@@ -210,8 +209,7 @@ curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 The worker logs `launch failed … retrying in Ns` and keeps retrying with exponential
 backoff (5 s → 2 min); the admin panel shows *"Telegram unreachable … Local playback and
 uploads keep working."* Nothing in the cafe player degrades — playback, uploads, reordering
-and streaming are entirely local. Set `TELEGRAM_API_ROOT` if you proxy the API through a
-reachable mirror.
+and streaming are entirely local.
 
 ---
 
@@ -252,9 +250,5 @@ for admins with optimistic UI and automatic rollback if the server rejects the c
   now also returns `categoryStats` (scoped to the requested playlist), the client
   compares like with like, and the poll additionally skips refetching while the user is
   viewing a locally shuffled order.
-* **Telegram API root:** `TELEGRAM_API_ROOT` is now honoured everywhere. It defaults to
-  the project's Cloudflare Worker mirror because `api.telegram.org` is filtered on some
-  networks; set it to `https://api.telegram.org` on an unfiltered one. The previous
-  hard-coded value contained a trailing space, which broke request URLs.
 * **Fonts:** unchanged from the original (`Inter` + system stack), resolved locally with
   no network fetch so the app stays fully offline-capable.

@@ -222,6 +222,10 @@ export function CafeApp({
       return;
     }
     const shuffled = fisherYates(songs);
+    if (shuffled.every((song, index) => song.id === songs[index].id)) {
+      const [first, ...rest] = shuffled;
+      shuffled.splice(0, shuffled.length, ...rest, first);
+    }
     shuffledRef.current = true;
     setSongs(shuffled);
     audioPlayer.setQueue(shuffled);
