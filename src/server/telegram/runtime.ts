@@ -52,6 +52,8 @@ const STANDBY_REPLY = [
 const STANDBY_REPLY_COOLDOWN_MS = 60_000;
 const STANDBY_POLL_TIMEOUT_SECONDS = 25;
 const STANDBY_ERROR_BACKOFF_MS = 10_000;
+/** After this many consecutive Telegram API failures, give up permanently. */
+const STANDBY_MAX_RETRIES = 3;
 
 type RuntimeState = {
   mode: BotMode;
@@ -125,10 +127,12 @@ type StandbyUpdate = {
 /**
  * Minimal long-poll listener. It only ever answers with STANDBY_REPLY, so a client who
  * sends music before pressing the button is told what to do instead of being ignored.
+ * Gives up after STANDBY_MAX_RETRIES consecutive failures to avoid spamming the logs.
  */
 async function runStandbyLoop(signal: AbortSignal): Promise<void> {
   let offset = 0;
   const lastReplyAt = new Map<number, number>();
+  let consecutiveFailures = 0;
 
   while (!signal.aborted) {
     try {
@@ -144,6 +148,8 @@ async function runStandbyLoop(signal: AbortSignal): Promise<void> {
       );
 
       if (signal.aborted) return;
+      consecutiveFailures = 0; // success resets the counter
+
       if (!updates) {
         // Token rejected, webhook registered, or another poller holds the lock.
         await sleep(STANDBY_ERROR_BACKOFF_MS, signal);
@@ -169,9 +175,20 @@ async function runStandbyLoop(signal: AbortSignal): Promise<void> {
       }
     } catch (error) {
       if (signal.aborted) return;
+      consecutiveFailures += 1;
+      if (consecutiveFailures > STANDBY_MAX_RETRIES) {
+        console.warn(
+          "[telegram] standby listener gave up after " + consecutiveFailures + " consecutive failures — Telegram API may be unreachable. The web player is unaffected.",
+        );
+        const current = state();
+        current.mode = "ERROR";
+        current.message =
+          "اتصال به تلگرام ممکن نیست — لطفاً اتصال اینترنت سرور را بررسی کنید.";
+        return;
+      }
       // Network cut (the whole point of this project) — retry quietly, never crash.
       console.warn(
-        "[telegram] standby listener retrying:",
+        "[telegram] standby listener retrying (" + consecutiveFailures + "/" + STANDBY_MAX_RETRIES + "):",
         error instanceof Error ? error.message : error,
       );
       await sleep(STANDBY_ERROR_BACKOFF_MS, signal);
