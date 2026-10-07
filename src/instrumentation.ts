@@ -1,11 +1,9 @@
 /**
  * Next.js server bootstrap hook.
  *
- * Arms the Telegram "standby" responder as soon as the web server starts, so a client
- * who sends music BEFORE pressing the "Connect Telegram bot" button in the admin
- * panel immediately gets a Persian reply telling them to press it first.
- *
- * Runs only in the Node.js runtime; the edge runtime has no long-lived polling.
+ * Arms the local Telegram standby responder and the daily music scheduler when
+ * the long-lived Node.js server starts. Both services have their own global
+ * singleton guards so Next.js development reloads cannot duplicate workers.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -17,6 +15,17 @@ export async function register(): Promise<void> {
     // Never block the web app because of Telegram.
     console.warn(
       "[instrumentation] telegram standby not armed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
+  try {
+    const { initializeDailyScheduler } = await import("@/jobs/scheduler");
+    initializeDailyScheduler();
+  } catch (error) {
+    // Do not crash Next.js if cron initialization itself fails.
+    console.error(
+      "[instrumentation] daily scheduler not started:",
       error instanceof Error ? error.message : error,
     );
   }

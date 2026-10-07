@@ -128,14 +128,21 @@ export function Field({
   label,
   hint,
   children,
+  rtl = false,
 }: {
   label: string;
   hint?: string;
   children: ReactNode;
+  rtl?: boolean;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-medium uppercase tracking-wider text-white/45">
+      <span
+        className={clsx(
+          "text-xs font-medium text-white/45",
+          rtl ? "" : "uppercase tracking-wider",
+        )}
+      >
         {label}
       </span>
       {children}

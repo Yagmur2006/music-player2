@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Bot,
+  CalendarClock,
   CheckCircle2,
   KeyRound,
   Loader2,
+  Pencil,
   Plus,
   Power,
   PowerOff,
@@ -21,13 +23,27 @@ import {
 import clsx from "clsx";
 import { Button, Field, Modal, Switch, inputClass } from "@/components/ui";
 import { api } from "@/lib/client-api";
-import { en } from "@/lib/i18n";
+import { en, scheduleFa } from "@/lib/i18n";
 import type {
   BotRuntimeDTO,
+  CategoryDTO,
+  ScheduleDTO,
   SessionUserDTO,
   SystemConfigDTO,
   TelegramStatusDTO,
 } from "@/lib/types";
+
+function scheduleErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("already exists")) return scheduleFa.duplicate;
+    if (message.includes("category") && message.includes("not found")) {
+      return scheduleFa.categoryMissing;
+    }
+    if (message.includes("time")) return scheduleFa.invalidTime;
+  }
+  return scheduleFa.error;
+}
 
 export function AdminPanel({
   open,
@@ -38,6 +54,7 @@ export function AdminPanel({
   onUserChange,
   notify,
   stats,
+  categories,
 }: {
   open: boolean;
   onClose: () => void;
@@ -47,6 +64,7 @@ export function AdminPanel({
   onUserChange: (next: SessionUserDTO) => void;
   notify: (message: string, tone?: "success" | "error" | "info") => void;
   stats: { songCount: number; categoryCount: number };
+  categories: CategoryDTO[];
 }) {
   const [telegram, setTelegram] = useState<TelegramStatusDTO | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,6 +82,24 @@ export function AdminPanel({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
+  const [schedules, setSchedules] = useState<ScheduleDTO[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleCategoryId, setScheduleCategoryId] = useState(categories[0]?.id ?? "");
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [confirmScheduleDeleteId, setConfirmScheduleDeleteId] = useState<string | null>(null);
+
+  const loadSchedules = useCallback(async () => {
+    setSchedulesLoading(true);
+    try {
+      setSchedules(await api.schedules());
+    } catch (error) {
+      notify(scheduleErrorMessage(error), "error");
+    } finally {
+      setSchedulesLoading(false);
+    }
+  }, [notify]);
 
   const loadTelegram = useCallback(async () => {
     setLoading(true);
@@ -85,11 +121,14 @@ export function AdminPanel({
   }, []);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
       void loadTelegram();
       void loadBotRuntime();
-    }
-  }, [open, loadTelegram, loadBotRuntime]);
+      void loadSchedules();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, loadTelegram, loadBotRuntime, loadSchedules]);
 
   /**
    * The one-click bot launcher (requirement #3): does exactly what `npm run bot`
@@ -132,9 +171,6 @@ export function AdminPanel({
       setBotBusy(false);
     }
   }, [notify]);
-
-  useEffect(() => setCafeName(config.cafeName), [config.cafeName]);
-  useEffect(() => setProfileUsername(user.username), [user.username]);
 
   const toggleGuestUpload = async (next: boolean) => {
     try {
@@ -216,6 +252,82 @@ export function AdminPanel({
     }
   };
 
+  const resetScheduleEditor = () => {
+    setEditingScheduleId(null);
+    setScheduleTime("");
+    setScheduleCategoryId(categories[0]?.id ?? "");
+    setConfirmScheduleDeleteId(null);
+  };
+
+  const saveSchedule = async () => {
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(scheduleTime)) {
+      notify(scheduleFa.invalidTime, "error");
+      return;
+    }
+    if (!scheduleCategoryId) {
+      notify(scheduleFa.categoryRequired, "error");
+      return;
+    }
+
+    setScheduleBusy(true);
+    try {
+      if (editingScheduleId) {
+        await api.updateSchedule(editingScheduleId, {
+          time: scheduleTime,
+          categoryId: scheduleCategoryId,
+        });
+      } else {
+        await api.createSchedule({ time: scheduleTime, categoryId: scheduleCategoryId });
+      }
+      await loadSchedules();
+      notify(editingScheduleId ? scheduleFa.updated : scheduleFa.added, "success");
+      resetScheduleEditor();
+    } catch (error) {
+      notify(scheduleErrorMessage(error), "error");
+    } finally {
+      setScheduleBusy(false);
+    }
+  };
+
+  const editSchedule = (schedule: ScheduleDTO) => {
+    setEditingScheduleId(schedule.id);
+    setScheduleTime(schedule.time);
+    setScheduleCategoryId(schedule.categoryId);
+    setConfirmScheduleDeleteId(null);
+  };
+
+  const toggleSchedule = async (schedule: ScheduleDTO, enabled: boolean) => {
+    setScheduleBusy(true);
+    try {
+      const updated = await api.updateSchedule(schedule.id, { enabled });
+      setSchedules((current) =>
+        current
+          .map((item) => (item.id === updated.id ? updated : item))
+          .sort((a, b) => a.time.localeCompare(b.time)),
+      );
+      notify(enabled ? scheduleFa.enabled : scheduleFa.disabled, "success");
+    } catch (error) {
+      notify(scheduleErrorMessage(error), "error");
+    } finally {
+      setScheduleBusy(false);
+    }
+  };
+
+  const removeSchedule = async (id: string) => {
+    setScheduleBusy(true);
+    try {
+      await api.deleteSchedule(id);
+      setSchedules((current) => current.filter((schedule) => schedule.id !== id));
+      if (editingScheduleId === id) resetScheduleEditor();
+      setConfirmScheduleDeleteId(null);
+      notify(scheduleFa.deleted, "success");
+    } catch (error) {
+      notify(scheduleErrorMessage(error), "error");
+    } finally {
+      setScheduleBusy(false);
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -243,6 +355,175 @@ export function AdminPanel({
             </div>
           ))}
         </div>
+
+        <section
+          dir="rtl"
+          lang="fa"
+          className="space-y-4 rounded-2xl border border-white/8 bg-black/25 p-4 text-right"
+        >
+          <div className="flex items-start gap-3">
+            <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <div>
+              <h3 className="text-sm font-semibold text-cafe-ink">{scheduleFa.title}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-white/45">
+                {scheduleFa.description}
+              </p>
+              <p className="mt-1 text-[11px] text-amber-200/65">{scheduleFa.timezone}</p>
+              <p className="mt-2 text-[11px] leading-relaxed text-white/35">
+                {scheduleFa.lockedHint}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[0.8fr_1.2fr_auto] sm:items-end">
+            <Field label={scheduleFa.time} rtl>
+              <input
+                className={inputClass}
+                type="time"
+                step={60}
+                dir="ltr"
+                required
+                value={scheduleTime}
+                onChange={(event) => setScheduleTime(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void saveSchedule();
+                }}
+              />
+            </Field>
+            <Field label={scheduleFa.category} rtl>
+              <select
+                className={inputClass}
+                value={scheduleCategoryId}
+                required
+                onChange={(event) => setScheduleCategoryId(event.target.value)}
+              >
+                <option value="">{scheduleFa.chooseCategory}</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => void saveSchedule()}
+                disabled={scheduleBusy || categories.length === 0}
+              >
+                {scheduleBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : editingScheduleId ? (
+                  <Save className="h-4 w-4" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {editingScheduleId ? scheduleFa.save : scheduleFa.add}
+              </Button>
+              {editingScheduleId ? (
+                <Button variant="ghost" onClick={resetScheduleEditor} disabled={scheduleBusy}>
+                  {scheduleFa.cancel}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          {categories.length === 0 ? (
+            <p className="text-xs text-amber-100/70">{scheduleFa.noCategories}</p>
+          ) : null}
+
+          <div className="space-y-2">
+            {schedulesLoading ? (
+              <div className="flex items-center gap-2 py-3 text-xs text-white/45">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {scheduleFa.loading}
+              </div>
+            ) : schedules.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">
+                {scheduleFa.empty}
+              </p>
+            ) : (
+              schedules.map((schedule) => (
+                <div
+                  key={schedule.id}
+                  className="flex flex-wrap items-center gap-3 rounded-xl border border-white/8 bg-black/30 p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-cafe-ink">
+                      <span className="rounded-lg bg-white/5 px-2.5 py-1 font-mono tabular-nums text-amber-200" dir="ltr">
+                        {schedule.time}
+                      </span>
+                      <span className="truncate">{schedule.category.name}</span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-white/50">
+                      {schedule.enabled ? scheduleFa.enabled : scheduleFa.disabled}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={schedule.enabled}
+                      aria-label={`${schedule.time} ${schedule.enabled ? scheduleFa.enabled : scheduleFa.disabled}`}
+                      disabled={scheduleBusy}
+                      onClick={() => void toggleSchedule(schedule, !schedule.enabled)}
+                      className={clsx(
+                        "relative h-7 w-12 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50",
+                        schedule.enabled ? "bg-emerald-500/80" : "bg-white/12",
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all",
+                          schedule.enabled ? "right-1" : "right-6",
+                        )}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={scheduleFa.edit}
+                      title={scheduleFa.edit}
+                      onClick={() => editSchedule(schedule)}
+                      className="rounded-lg p-2 text-white/50 transition hover:bg-white/5 hover:text-white"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    {confirmScheduleDeleteId === schedule.id ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="danger"
+                          onClick={() => void removeSchedule(schedule.id)}
+                          disabled={scheduleBusy}
+                          className="!px-2.5 !py-2 !text-xs"
+                        >
+                          {scheduleFa.deleteConfirm}
+                        </Button>
+                        <button
+                          type="button"
+                          aria-label={scheduleFa.cancelDelete}
+                          onClick={() => setConfirmScheduleDeleteId(null)}
+                          className="rounded-lg p-2 text-white/45 hover:bg-white/5"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={scheduleFa.delete}
+                        title={scheduleFa.delete}
+                        onClick={() => setConfirmScheduleDeleteId(schedule.id)}
+                        className="rounded-lg p-2 text-white/45 transition hover:bg-white/5 hover:text-rose-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         <Switch
           checked={config.allowGuestUpload}

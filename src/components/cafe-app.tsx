@@ -166,25 +166,30 @@ export function CafeApp({
     [loadSongs, notify],
   );
 
-  const [hydrated, setHydrated] = useState(false);
+  const skipInitialSongsLoadRef = useRef(true);
+  const playerQueueLength = audioPlayer.state.queue.length;
+  const isScheduledPlayback = audioPlayer.state.isScheduled;
+  const setPlayerQueue = audioPlayer.setQueue;
+  const setPlayerCategoryName = audioPlayer.setCategoryName;
 
   useEffect(() => {
-    if (audioPlayer.state.queue.length > 0) return;
-    audioPlayer.setQueue(songs);
-  }, [audioPlayer, audioPlayer.state.queue.length, songs]);
+    if (playerQueueLength > 0) return;
+    setPlayerQueue(songs);
+  }, [playerQueueLength, setPlayerQueue, songs]);
 
   useEffect(() => {
-    audioPlayer.setCategoryName(activeCategory?.name ?? "Library");
-  }, [audioPlayer, activeCategory]);
+    if (!isScheduledPlayback) {
+      setPlayerCategoryName(activeCategory?.name ?? "Library");
+    }
+  }, [setPlayerCategoryName, isScheduledPlayback, activeCategory?.name]);
 
   useEffect(() => {
-    if (!hydrated) {
-      setHydrated(true);
+    if (skipInitialSongsLoadRef.current) {
+      skipInitialSongsLoadRef.current = false;
       return;
     }
     void loadSongs(activeCategoryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategoryId]);
+  }, [activeCategoryId, loadSongs]);
 
   useEffect(() => {
     if (!activeCategoryId) return;
@@ -217,6 +222,10 @@ export function CafeApp({
    * never disturbs the order other people (or the Telegram bot) see.
    */
   const handleShuffleAll = useCallback(() => {
+    if (audioPlayer.state.isScheduled) {
+      notify(en.scheduledPlaybackLocked, "info");
+      return;
+    }
     if (songs.length < 2) {
       notify(en.shuffleNeedsTracks, "info");
       return;
@@ -302,6 +311,7 @@ export function CafeApp({
             <Button
               variant="ghost"
               onClick={handleShuffleAll}
+              disabled={audioPlayer.state.isScheduled}
               className="!px-3"
               title={en.shuffleAllTitle}
             >
@@ -452,10 +462,15 @@ export function CafeApp({
           songs={visibleSongs}
           currentSongId={audioPlayer.state.currentSong?.id ?? null}
           isPlaying={audioPlayer.state.isPlaying}
-          user={user}
-          loading={loadingSongs}
-          onSelect={(song) => {
-            if (song.id === audioPlayer.state.currentSong?.id) {
+        user={user}
+        loading={loadingSongs}
+        playbackLocked={audioPlayer.state.isScheduled}
+        onSelect={(song) => {
+          if (audioPlayer.state.isScheduled) {
+            notify(en.scheduledPlaybackLocked, "info");
+            return;
+          }
+          if (song.id === audioPlayer.state.currentSong?.id) {
               audioPlayer.togglePlay();
               return;
             }
@@ -519,6 +534,7 @@ export function CafeApp({
           onUserChange={setUser}
           notify={notify}
           stats={{ songCount: totalTracks, categoryCount: categories.length }}
+          categories={categories}
         />
       ) : null}
 

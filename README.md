@@ -38,10 +38,15 @@ disappears, the bot degrades gracefully and the cafe player keeps working locall
   `category_id → categories.id ON DELETE CASCADE`, `created_at`
 * **system_config** — fixed `id = 1`, `allow_guest_upload bool`, `cafe_name`, `updated_at`
 * **telegram_whitelist** — `id uuid pk`, `telegram_id unique`, `label`, `created_at`
+* **schedules** — daily `HH:mm` slot (unique), category FK, enabled flag and timestamps
+* **schedule_executions** — unique Tehran date/time marker; prevents a slot from running twice
+* **playback_state** — one durable row with the current schedule, ordered JSON playlist snapshot,
+  index, status and start time
 
-`src/db/bootstrap.ts` applies idempotent DDL (`CREATE TABLE IF NOT EXISTS`, enum guards) and seeds
-default accounts, four playlists and six royalty-free ambient demo tracks on first boot — so a fresh
-VPS install is playable immediately, offline.
+`src/db/bootstrap.ts` applies the pre-existing core DDL (`CREATE TABLE IF NOT EXISTS`, enum guards)
+and seeds default accounts and demo playlists/tracks. It then applies the additive scheduler schema
+through Drizzle's migration runner before schedule/playback services are used. The versioned SQL is
+`drizzle/0000_daily_category_music_scheduler.sql`.
 
 ---
 
@@ -56,7 +61,12 @@ VPS install is playable immediately, offline.
 | `POST /api/categories` | ADMIN | create playlist (auto unique slug) |
 | `PUT /api/categories` | ADMIN | `{ categoryOrders: [{ id, order }] }` |
 | `PATCH /api/categories/:id` | ADMIN | rename / edit description / accent |
-| `DELETE /api/categories/:id` | ADMIN | cascade-deletes songs **and** their files on disk |
+| `DELETE /api/categories/:id` | ADMIN | cascade-deletes songs **and** their files on disk; blocked while a schedule uses the category |
+| `GET /api/schedules` / `GET /api/schedules/:id` | ADMIN | read valid schedules ordered by daily `HH:mm` |
+| `POST /api/schedules` | ADMIN | create a daily category schedule (unique time, enabled by default) |
+| `PUT/PATCH/DELETE /api/schedules/:id` | ADMIN | edit, enable/disable, or remove future schedule runs |
+| `GET /api/playback` | public player | current playback state and immutable playlist snapshot |
+| `PATCH /api/playback` | public player | report progress only for the current execution; cannot start or replace a schedule |
 | `GET /api/songs?categoryId=…` | public | ordered by `order ASC` (`&stats=1` adds library totals **and** `categoryStats` for the requested playlist) |
 | `POST /api/songs/upload` | ADMIN, or GUEST when `allowGuestUpload` | multipart: `file`, `categoryId`, `title?`, `artist?`, `duration?` |
 | `PUT /api/songs/reorder` | ADMIN | `{ categoryId, songOrders: [{ id, order }] }` (single transaction) |
@@ -69,6 +79,13 @@ VPS install is playable immediately, offline.
 | `GET/POST /api/telegram/runtime` | ADMIN | start/stop the bot from the UI (`{ action: "start" \| "stop" }`) — the in-app `npm run bot` |
 | `POST /api/telegram/webhook` | Telegram | webhook transport (optional secret token header) |
 | `GET /api/health` | public | DB, storage, telegram and library status |
+
+The daily music scheduler is registered by `src/instrumentation.ts` only in the Node.js runtime.
+A singleton `node-cron` task checks `* * * * *` in `Asia/Tehran`; an atomic date/time marker
+prevents duplicates. Startup recovery runs the latest enabled slot already passed today, but never
+replays a slot whose marker exists. Each execution snapshots the category's saved song order, and
+the existing player polls playback state every 1.5 seconds. The client reports only index changes and
+playlist completion, so refreshes retain the server-owned snapshot without adding a run-now action.
 
 Every handler is wrapped in `withErrorHandling` (`src/lib/http.ts`) → structured
 `{ error, code }` JSON with the right HTTP status; no unhandled promise rejections.
@@ -115,7 +132,15 @@ TELEGRAM_BOT_USERNAME=CafeMusicSyncBot
 TELEGRAM_WEBHOOK_SECRET=
 ```
 
-Schema is applied automatically at runtime; to sync manually use `npx drizzle-kit push`.
+The app applies the core bootstrap and then runs the scheduler's versioned Drizzle migration
+automatically. To run or verify migrations explicitly against an already bootstrapped database
+(`DATABASE_URL` is read from the shell, `.env.local`, or `.env`):
+
+```bash
+npm run db:migrate
+```
+
+For future schema changes, use `npm run db:generate` and review the generated SQL before migrating.
 Regenerate the bundled demo tracks with `node scripts/generate-seed-audio.mjs`.
 
 ---

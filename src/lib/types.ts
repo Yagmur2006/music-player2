@@ -33,6 +33,45 @@ export type SongDTO = {
   createdAt: string;
 };
 
+export type ScheduleCategoryDTO = {
+  id: string;
+  name: string;
+  slug: string;
+  accent: string;
+};
+
+export type ScheduleDTO = {
+  id: string;
+  time: string;
+  categoryId: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  category: ScheduleCategoryDTO;
+};
+
+export type PlaybackStatus = "IDLE" | "PLAYING" | "WAITING";
+
+export type PlaybackCategoryDTO = {
+  id: string | null;
+  name: string;
+  slug: string | null;
+  accent: string | null;
+};
+
+export type PlaybackDTO = {
+  status: PlaybackStatus;
+  executionId: string | null;
+  scheduleId: string | null;
+  schedule: { id: string; time: string } | null;
+  category: PlaybackCategoryDTO | null;
+  playlist: SongDTO[];
+  currentSong: SongDTO | null;
+  currentIndex: number;
+  startedAt: string | null;
+  updatedAt: string;
+};
+
 export type SystemConfigDTO = {
   allowGuestUpload: boolean;
   cafeName: string;

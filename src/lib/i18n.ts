@@ -64,6 +64,8 @@ export const en = {
   repeatLabel: (mode: string) =>
     `Repeat: ${mode === "ONE" ? "one" : mode === "ALL" ? "all" : "off"}`,
   playbackError: "Playback failed — the audio file may be missing on the server.",
+  scheduledPlaybackLocked:
+    "Automatic playback is running. Playlist controls are locked until the schedule finishes.",
 
   // ---- Auth ----
   loginTitle: "Staff sign in",
@@ -127,6 +129,27 @@ export const en = {
   settingsSaved: "Cafe name updated",
   libraryStats: (songs: number, categories: number) =>
     `${songs} tracks across ${categories} playlists`,
+  scheduleTitle: "Daily music schedule",
+  scheduleDescription:
+    "Schedules run every day in Asia/Tehran time. The saved playlist order is used without shuffle or repeat.",
+  scheduleTime: "Time (24-hour)",
+  scheduleCategory: "Playlist category",
+  scheduleAdd: "Add schedule",
+  scheduleSave: "Save changes",
+  scheduleEnabled: "Enabled",
+  scheduleDisabled: "Disabled",
+  scheduleEmpty: "No daily schedules yet.",
+  scheduleDuplicate: "A schedule already exists for this time.",
+  scheduleInvalidTime: "The entered time is invalid.",
+  scheduleCategoryRequired: "Choose a playlist category.",
+  scheduleAdded: "Daily schedule added",
+  scheduleUpdated: "Daily schedule updated",
+  scheduleDeleted: "Daily schedule deleted",
+  scheduleDeleteConfirm: "Confirm delete",
+  scheduleEdit: "Edit schedule",
+  scheduleCancel: "Cancel edit",
+  scheduleTimezone: "Timezone: Asia/Tehran · Runs every day",
+  scheduleLockedHint: "While a scheduled playlist is active, manual playlist controls are locked.",
 
   // ---- Admin: credentials ----
   credentials: "Admin account",
@@ -168,6 +191,39 @@ export const en = {
   couldNotCheckUpdates: "Could not check for music updates",
   closeDialog: "Close dialog",
   sessionExpired: "Your session has expired. Please sign in again.",
+} as const;
+
+/** Persian copy for the schedule manager (the rest of the Admin panel stays English). */
+export const scheduleFa = {
+  title: "زمان‌بندی روزانهٔ موسیقی",
+  description:
+    "پخش هر روز در زمان تعیین‌شده و بر اساس ساعت تهران آغاز می‌شود. ترتیب ذخیره‌شدهٔ آهنگ‌ها بدون پخش تصادفی یا تکرار اجرا خواهد شد.",
+  timezone: "منطقهٔ زمانی: تهران (Asia/Tehran) · تکرار روزانه",
+  time: "زمان پخش (۲۴ ساعته)",
+  category: "دسته‌بندی پخش",
+  chooseCategory: "یک دسته‌بندی انتخاب کنید",
+  noCategories: "برای افزودن زمان‌بندی، ابتدا یک دسته‌بندی بسازید.",
+  add: "افزودن زمان‌بندی",
+  save: "ذخیرهٔ تغییرات",
+  cancel: "لغو ویرایش",
+  cancelDelete: "انصراف از حذف",
+  enabled: "فعال",
+  disabled: "غیرفعال",
+  empty: "هنوز زمان‌بندی روزانه‌ای ثبت نشده است.",
+  duplicate: "برای این ساعت، زمان‌بندی دیگری از قبل ثبت شده است.",
+  invalidTime: "زمان واردشده معتبر نیست؛ زمان را با قالب ساعت و دقیقه وارد کنید.",
+  categoryRequired: "یک دسته‌بندی برای پخش انتخاب کنید.",
+  categoryMissing: "دسته‌بندی انتخاب‌شده پیدا نشد.",
+  added: "زمان‌بندی روزانه افزوده شد.",
+  updated: "زمان‌بندی روزانه به‌روزرسانی شد.",
+  deleted: "زمان‌بندی روزانه حذف شد.",
+  deleteConfirm: "حذف زمان‌بندی",
+  edit: "ویرایش زمان‌بندی",
+  delete: "حذف زمان‌بندی",
+  loading: "در حال بارگذاری زمان‌بندی‌ها…",
+  error: "عملیات زمان‌بندی ناموفق بود. دوباره تلاش کنید.",
+  lockedHint:
+    "هنگام پخش، تغییر یا حذف این زمان‌بندی روی فهرست جاری اثر ندارد و کنترل‌های دستی تا پایان پخش قفل می‌مانند.",
 } as const;
 
 export type Dictionary = typeof en;
