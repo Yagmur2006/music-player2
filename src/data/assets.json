@@ -1,0 +1,22 @@
+{
+  "_comment": "Asset registry for the simulator prototype. Paths are relative to public/. Update status when a file is added.",
+  "models": {
+    "smd_resistor_001": {
+      "path": "/models/components/smd-resistor.glb",
+      "format": "glb",
+      "status": "pending_upload",
+      "source_file": "smd resistor.glb (provided by project owner)",
+      "fallback": "placeholder_box_with_todo"
+    }
+  },
+  "boards": {
+    "samsung_a30_top": {
+      "path": "/images/boards/samsung-a30-board-top.png",
+      "status": "pending_upload"
+    },
+    "samsung_a30_bottom": {
+      "path": "/images/boards/samsung-a30-board-bottom.png",
+      "status": "pending_upload"
+    }
+  }
+}
