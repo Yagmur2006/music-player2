@@ -172,20 +172,17 @@ export function PlayerDock({
               label={en.shuffle}
               active={state.shuffle}
               onClick={onToggleShuffle}
-              disabled={state.isScheduled}
               icon={<Shuffle className="h-4 w-4" />}
             />
             <ControlButton
               label={en.previous}
               onClick={onPrevious}
-              disabled={state.isScheduled}
               icon={<SkipBack className="h-5 w-5" />}
             />
             <button
               type="button"
               onClick={onToggle}
               aria-label={state.isPlaying ? en.pause : en.play}
-              disabled={state.isScheduled && state.isPlaying}
               className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500 text-cafe-950 shadow-lg shadow-amber-500/25 transition hover:bg-amber-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {state.isPlaying ? (
@@ -197,14 +194,12 @@ export function PlayerDock({
             <ControlButton
               label={en.next}
               onClick={onNext}
-              disabled={state.isScheduled}
               icon={<SkipForward className="h-5 w-5" />}
             />
             <ControlButton
               label={en.repeatLabel(state.repeat)}
               active={state.repeat !== "OFF"}
               onClick={onCycleRepeat}
-              disabled={state.isScheduled}
               icon={
                 state.repeat === "ONE" ? (
                   <Repeat1 className="h-4 w-4" />
@@ -226,7 +221,7 @@ export function PlayerDock({
               step={0.1}
               value={displayTime}
               aria-label={en.seek}
-              disabled={!currentSong || state.isScheduled}
+              disabled={!currentSong}
               onChange={(event) => setScrubbing(Number(event.target.value))}
               onMouseUp={(event) => {
                 onSeek(Number((event.target as HTMLInputElement).value));

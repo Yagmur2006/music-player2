@@ -103,11 +103,6 @@ export async function reportPlaybackProgress(input: {
     if (input.currentIndex > playlist.length) {
       throw badRequest("currentIndex is outside the scheduled playlist");
     }
-    if (input.currentIndex < current.currentIndex) {
-      // Several public player tabs may be open. Never let a slower tab rewind the
-      // durable server index after another tab has already advanced the playlist.
-      return { success: true, updated: false };
-    }
     if (input.currentIndex === current.currentIndex) {
       return { success: true, updated: false };
     }

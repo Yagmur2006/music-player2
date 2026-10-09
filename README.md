@@ -84,8 +84,11 @@ The daily music scheduler is registered by `src/instrumentation.ts` only in the 
 A singleton `node-cron` task checks `* * * * *` in `Asia/Tehran`; an atomic date/time marker
 prevents duplicates. Startup recovery runs the latest enabled slot already passed today, but never
 replays a slot whose marker exists. Each execution snapshots the category's saved song order, and
-the existing player polls playback state every 1.5 seconds. The client reports only index changes and
-playlist completion, so refreshes retain the server-owned snapshot without adding a run-now action.
+the existing player polls playback state every 1.5 seconds. If a track is already playing when a
+schedule becomes due, its immutable snapshot is queued and starts when that track ends (an idle player
+starts it immediately). Pause/resume, seek, next/previous, shuffle, repeat and track selection remain
+available to the user. The client reports index changes and playlist completion, so refreshes retain
+the server-owned snapshot without adding a run-now action.
 
 Every handler is wrapped in `withErrorHandling` (`src/lib/http.ts`) → structured
 `{ error, code }` JSON with the right HTTP status; no unhandled promise rejections.

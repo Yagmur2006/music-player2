@@ -64,8 +64,6 @@ export const en = {
   repeatLabel: (mode: string) =>
     `Repeat: ${mode === "ONE" ? "one" : mode === "ALL" ? "all" : "off"}`,
   playbackError: "Playback failed — the audio file may be missing on the server.",
-  scheduledPlaybackLocked:
-    "Automatic playback is running. Playlist controls are locked until the schedule finishes.",
 
   // ---- Auth ----
   loginTitle: "Staff sign in",
@@ -149,7 +147,6 @@ export const en = {
   scheduleEdit: "Edit schedule",
   scheduleCancel: "Cancel edit",
   scheduleTimezone: "Timezone: Asia/Tehran · Runs every day",
-  scheduleLockedHint: "While a scheduled playlist is active, manual playlist controls are locked.",
 
   // ---- Admin: credentials ----
   credentials: "Admin account",
@@ -223,7 +220,7 @@ export const scheduleFa = {
   loading: "در حال بارگذاری زمان‌بندی‌ها…",
   error: "عملیات زمان‌بندی ناموفق بود. دوباره تلاش کنید.",
   lockedHint:
-    "هنگام پخش، تغییر یا حذف این زمان‌بندی روی فهرست جاری اثر ندارد و کنترل‌های دستی تا پایان پخش قفل می‌مانند.",
+    "با رسیدن زمان، آهنگ جاری تا پایان پخش می‌شود؛ سپس پخش از این دسته‌بندی آغاز خواهد شد و کنترل کامل Player در اختیار شماست.",
 } as const;
 
 export type Dictionary = typeof en;

@@ -21,7 +21,6 @@ export function PlaylistBoard({
   isPlaying,
   user,
   loading,
-  playbackLocked,
   onSelect,
   onReorder,
   onDelete,
@@ -31,7 +30,6 @@ export function PlaylistBoard({
   isPlaying: boolean;
   user: SessionUserDTO | null;
   loading: boolean;
-  playbackLocked: boolean;
   onSelect: (song: SongDTO) => void;
   onReorder: (ordered: SongDTO[]) => void;
   onDelete: (song: SongDTO) => void;
@@ -86,7 +84,6 @@ export function PlaylistBoard({
       active={song.id === currentSongId}
       isPlaying={isPlaying && song.id === currentSongId}
       isAdmin={isAdmin}
-      playbackLocked={playbackLocked}
       draggable={false}
       onSelect={onSelect}
       onDelete={onDelete}
@@ -124,7 +121,6 @@ export function PlaylistBoard({
                       active={song.id === currentSongId}
                       isPlaying={isPlaying && song.id === currentSongId}
                       isAdmin
-                      playbackLocked={playbackLocked}
                       draggable
                       dragging={draggableSnapshot.isDragging}
                       dragHandleProps={draggableProvided.dragHandleProps ?? undefined}
@@ -149,7 +145,6 @@ function SongRow({
   active,
   isPlaying,
   isAdmin,
-  playbackLocked,
   draggable,
   dragging,
   dragHandleProps,
@@ -161,7 +156,6 @@ function SongRow({
   active: boolean;
   isPlaying: boolean;
   isAdmin: boolean;
-  playbackLocked: boolean;
   draggable: boolean;
   dragging?: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps;
@@ -195,7 +189,6 @@ function SongRow({
       <button
         type="button"
         onClick={() => onSelect(song)}
-        disabled={playbackLocked}
         aria-label={en.playAria(song.title)}
         className={clsx(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-40",
@@ -210,8 +203,7 @@ function SongRow({
       <button
         type="button"
         onClick={() => onSelect(song)}
-        disabled={playbackLocked}
-        className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
+        className="min-w-0 flex-1 text-left"
       >
         <p
           className={clsx(

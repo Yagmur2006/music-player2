@@ -31,6 +31,13 @@ export type PlayerState = {
   isScheduled: boolean;
 };
 
+type PendingScheduledPlaylist = {
+  executionId: string;
+  songs: SongDTO[];
+  startIndex: number;
+  onStart: () => void;
+};
+
 export function useAudioPlayer(
   initialPlaylist: SongDTO[],
   audioRef: RefObject<HTMLAudioElement | null>,
@@ -52,6 +59,8 @@ export function useAudioPlayer(
   const queueRef = useRef(initialPlaylist);
   const playAttemptRef = useRef(0);
   const isScheduledRef = useRef(false);
+  const scheduledSongIdsRef = useRef(new Set<string>());
+  const pendingScheduledPlaylistRef = useRef<PendingScheduledPlaylist | null>(null);
 
   const updateQueue = useCallback((songs: SongDTO[]) => {
     queueRef.current = songs;
@@ -65,13 +74,31 @@ export function useAudioPlayer(
     return null;
   }, [queue, currentId, currentSongFallback]);
 
-  const setQueue = useCallback(
-    (songs: SongDTO[]) => {
-      if (isScheduledRef.current) return;
-      updateQueue(songs);
+  const setQueue = useCallback((songs: SongDTO[]) => updateQueue(songs), [updateQueue]);
+
+  const queueScheduledPlaylist = useCallback(
+    (
+      executionId: string,
+      songs: SongDTO[],
+      startIndex: number,
+      onStart: () => void,
+    ) => {
+      pendingScheduledPlaylistRef.current = {
+        executionId,
+        songs,
+        startIndex,
+        onStart,
+      };
     },
-    [updateQueue],
+    [],
   );
+
+  const clearPendingScheduledPlaylist = useCallback((executionId?: string) => {
+    const pending = pendingScheduledPlaylistRef.current;
+    if (!executionId || pending?.executionId === executionId) {
+      pendingScheduledPlaylistRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -192,6 +219,8 @@ export function useAudioPlayer(
         }
       }
 
+      pendingScheduledPlaylistRef.current = null;
+      scheduledSongIdsRef.current = new Set(songs.map((song) => song.id));
       isScheduledRef.current = true;
       setIsScheduled(true);
       setShuffle(false);
@@ -221,12 +250,9 @@ export function useAudioPlayer(
   );
 
   const playScheduledTrack = useCallback(
-    (index: number) => {
-      if (!isScheduledRef.current) return;
-      const songs = queueRef.current;
-      if (!Number.isInteger(index) || index < 0 || index >= songs.length) return;
-      const song = songs[index];
-      if (!song) return;
+    (remoteSong: SongDTO) => {
+      if (!isScheduledRef.current || !scheduledSongIdsRef.current.has(remoteSong.id)) return;
+      const song = queueRef.current.find((entry) => entry.id === remoteSong.id) ?? remoteSong;
 
       playAttemptRef.current += 1;
       const audio = audioRef.current;
@@ -250,6 +276,8 @@ export function useAudioPlayer(
   );
 
   const stopScheduledPlaylist = useCallback(() => {
+    pendingScheduledPlaylistRef.current = null;
+    scheduledSongIdsRef.current.clear();
     playAttemptRef.current += 1;
     const audio = audioRef.current;
     if (audio) {
@@ -275,9 +303,15 @@ export function useAudioPlayer(
 
   const playTrack = useCallback(
     (song?: SongDTO) => {
-      if (isScheduledRef.current || !song || song.id === currentId) return;
-      isScheduledRef.current = false;
-      setIsScheduled(false);
+      if (!song || song.id === currentId) return;
+      if (isScheduledRef.current && !scheduledSongIdsRef.current.has(song.id)) {
+        // The player remains fully controllable. Songs outside the scheduled
+        // snapshot become ordinary local playback instead of being forced back
+        // to the server-owned category on the next poll.
+        isScheduledRef.current = false;
+        scheduledSongIdsRef.current.clear();
+        setIsScheduled(false);
+      }
       // Cancel any pending automated transitions or previous play attempts.
       playAttemptRef.current += 1;
       void loadAndPlay(song, true);
@@ -290,7 +324,6 @@ export function useAudioPlayer(
     if (!audio || !currentSong) return;
 
     if (!audio.paused) {
-      if (isScheduledRef.current) return;
       audio.pause();
       setIsPlaying(false);
       return;
@@ -320,7 +353,6 @@ export function useAudioPlayer(
   }, [audioRef, currentSong, currentId]);
 
   const pause = useCallback(() => {
-    if (isScheduledRef.current) return;
     audioRef.current?.pause();
     setIsPlaying(false);
   }, [audioRef]);
@@ -340,7 +372,6 @@ export function useAudioPlayer(
 
   const step = useCallback(
     (direction: 1 | -1, userInitiated = true) => {
-      if (isScheduledRef.current && userInitiated) return;
       const ids = orderedIds;
       if (ids.length === 0) return;
       // Use the actual audio element's loaded source id first to avoid
@@ -363,7 +394,7 @@ export function useAudioPlayer(
 
       let nextIndex = index + direction;
       if (nextIndex >= ids.length) {
-        if (!userInitiated && (repeat === "OFF" || isScheduledRef.current)) {
+        if (!userInitiated && repeat === "OFF") {
           if (isScheduledRef.current) {
             playAttemptRef.current += 1;
             audio?.pause();
@@ -378,13 +409,9 @@ export function useAudioPlayer(
           }
           return;
         }
-        if (isScheduledRef.current) return;
         nextIndex = 0;
       }
-      if (nextIndex < 0) {
-        if (isScheduledRef.current) return;
-        nextIndex = ids.length - 1;
-      }
+      if (nextIndex < 0) nextIndex = ids.length - 1;
 
       const nextId = ids[nextIndex];
       const nextSong = queueRef.current.find((song) => song.id === nextId);
@@ -399,7 +426,6 @@ export function useAudioPlayer(
 
   const next = useCallback(() => step(1, true), [step]);
   const previous = useCallback(() => {
-    if (isScheduledRef.current) return;
     const audio = audioRef.current;
     if (audio && audio.currentTime > 3) {
       audio.currentTime = 0;
@@ -414,17 +440,24 @@ export function useAudioPlayer(
     const audio = audioRef.current;
     if (!audio) return;
     const onEnded = () => {
+      const pending = pendingScheduledPlaylistRef.current;
+      if (pending) {
+        pendingScheduledPlaylistRef.current = null;
+        pending.onStart();
+        if (pending.songs.length === 0) return;
+        startScheduledPlaylist(pending.songs, pending.startIndex);
+        return;
+      }
       // When the element naturally ends, advance using the live audio dataset
       // to compute the next track and start it.
       step(1, false);
     };
     audio.addEventListener("ended", onEnded);
     return () => audio.removeEventListener("ended", onEnded);
-  }, [audioRef, step]);
+  }, [audioRef, startScheduledPlaylist, step]);
 
   const seek = useCallback(
     (seconds: number) => {
-      if (isScheduledRef.current) return;
       const audio = audioRef.current;
       if (!audio) return;
       const safe = Math.max(0, Math.min(seconds, audio.duration || seconds));
@@ -441,12 +474,8 @@ export function useAudioPlayer(
   }, []);
 
   const toggleMute = useCallback(() => setMuted((prev) => !prev), []);
-  const toggleShuffle = useCallback(() => {
-    if (isScheduledRef.current) return;
-    setShuffle((prev) => !prev);
-  }, []);
+  const toggleShuffle = useCallback(() => setShuffle((prev) => !prev), []);
   const cycleRepeat = useCallback(() => {
-    if (isScheduledRef.current) return;
     setRepeat((prev) => (prev === "OFF" ? "ALL" : prev === "ALL" ? "ONE" : "OFF"));
   }, []);
 
@@ -479,6 +508,8 @@ export function useAudioPlayer(
     toggleShuffle,
     cycleRepeat,
     setQueue,
+    queueScheduledPlaylist,
+    clearPendingScheduledPlaylist,
     startScheduledPlaylist,
     playScheduledTrack,
     stopScheduledPlaylist,

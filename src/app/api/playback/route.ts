@@ -14,8 +14,8 @@ export const GET = withErrorHandling(async () => {
 });
 
 /**
- * PATCH /api/playback -> progress report from the existing public player.
- * This can only advance the current execution; it cannot run or replace a schedule.
+ * PATCH /api/playback -> position report from the existing public player.
+ * It can move within the current snapshot but cannot replace it or start a schedule.
  */
 export const PATCH = withErrorHandling(async (request: Request) => {
   await ensureBootstrap();

@@ -168,7 +168,9 @@ export function CafeApp({
 
   const skipInitialSongsLoadRef = useRef(true);
   const playerQueueLength = audioPlayer.state.queue.length;
-  const isScheduledPlayback = audioPlayer.state.isScheduled;
+  const scheduledCategoryId = audioPlayer.scheduledCategoryId;
+  const scheduledExecutionId = audioPlayer.scheduledExecutionId;
+  const lastAutoSelectedScheduleRef = useRef<string | null>(null);
   const setPlayerQueue = audioPlayer.setQueue;
   const setPlayerCategoryName = audioPlayer.setCategoryName;
 
@@ -178,10 +180,20 @@ export function CafeApp({
   }, [playerQueueLength, setPlayerQueue, songs]);
 
   useEffect(() => {
-    if (!isScheduledPlayback) {
-      setPlayerCategoryName(activeCategory?.name ?? "Library");
-    }
-  }, [setPlayerCategoryName, isScheduledPlayback, activeCategory?.name]);
+    if (!scheduledExecutionId || !scheduledCategoryId) return;
+    if (lastAutoSelectedScheduleRef.current === scheduledExecutionId) return;
+    if (!categories.some((category) => category.id === scheduledCategoryId)) return;
+    const executionId = scheduledExecutionId;
+    const timer = window.setTimeout(() => {
+      lastAutoSelectedScheduleRef.current = executionId;
+      setActiveCategoryId(scheduledCategoryId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [scheduledExecutionId, scheduledCategoryId, categories]);
+
+  useEffect(() => {
+    setPlayerCategoryName(activeCategory?.name ?? "Library");
+  }, [setPlayerCategoryName, activeCategory?.name]);
 
   useEffect(() => {
     if (skipInitialSongsLoadRef.current) {
@@ -222,10 +234,6 @@ export function CafeApp({
    * never disturbs the order other people (or the Telegram bot) see.
    */
   const handleShuffleAll = useCallback(() => {
-    if (audioPlayer.state.isScheduled) {
-      notify(en.scheduledPlaybackLocked, "info");
-      return;
-    }
     if (songs.length < 2) {
       notify(en.shuffleNeedsTracks, "info");
       return;
@@ -311,7 +319,6 @@ export function CafeApp({
             <Button
               variant="ghost"
               onClick={handleShuffleAll}
-              disabled={audioPlayer.state.isScheduled}
               className="!px-3"
               title={en.shuffleAllTitle}
             >
@@ -462,15 +469,10 @@ export function CafeApp({
           songs={visibleSongs}
           currentSongId={audioPlayer.state.currentSong?.id ?? null}
           isPlaying={audioPlayer.state.isPlaying}
-        user={user}
-        loading={loadingSongs}
-        playbackLocked={audioPlayer.state.isScheduled}
-        onSelect={(song) => {
-          if (audioPlayer.state.isScheduled) {
-            notify(en.scheduledPlaybackLocked, "info");
-            return;
-          }
-          if (song.id === audioPlayer.state.currentSong?.id) {
+          user={user}
+          loading={loadingSongs}
+          onSelect={(song) => {
+            if (song.id === audioPlayer.state.currentSong?.id) {
               audioPlayer.togglePlay();
               return;
             }
