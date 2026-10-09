@@ -130,7 +130,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const startRemoteExecution = useCallback(
+  const markRemoteExecutionActive = useCallback(
     (remote: PlaybackDTO) => {
       if (!remote.executionId || remote.playlist.length === 0) return;
       clearPendingScheduledPlaylist();
@@ -142,9 +142,17 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setScheduledCategoryId(remote.category?.id ?? null);
       setScheduledExecutionId(remote.executionId);
       setCategoryName(remote.category?.name ?? "Library");
+    },
+    [clearPendingScheduledPlaylist],
+  );
+
+  const startRemoteExecution = useCallback(
+    (remote: PlaybackDTO) => {
+      if (!remote.executionId || remote.playlist.length === 0) return;
+      markRemoteExecutionActive(remote);
       startScheduledPlaylist(remote.playlist, remote.currentIndex);
     },
-    [clearPendingScheduledPlaylist, startScheduledPlaylist],
+    [markRemoteExecutionActive, startScheduledPlaylist],
   );
 
   const deferRemoteExecution = useCallback(
@@ -172,10 +180,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           stopScheduledPlaylist();
           return;
         }
-        startRemoteExecution(remote);
+        // The audio hook starts this queued snapshot immediately after the
+        // current track's ended event returns. Only promote the server identity
+        // here so the same playlist isn't started twice.
+        markRemoteExecutionActive(remote);
       });
     },
-    [queueScheduledPlaylist, startRemoteExecution, stopScheduledPlaylist],
+    [markRemoteExecutionActive, queueScheduledPlaylist, stopScheduledPlaylist],
   );
 
   /** Read server playback state every 1.5 seconds without interrupting the active track. */
