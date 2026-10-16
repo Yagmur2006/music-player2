@@ -1,6 +1,6 @@
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, songs, type CategoryRow } from "@/db/schema";
+import { categories, schedules, songs, type CategoryRow } from "@/db/schema";
 import type { CategoryDTO } from "@/lib/types";
 import { badRequest, conflict, notFound, slugify } from "@/lib/http";
 import { deleteStoredFile } from "@/lib/storage";
@@ -133,6 +133,15 @@ export async function updateCategory(
 
 export async function deleteCategory(id: string): Promise<{ deletedSongs: number }> {
   await getCategoryById(id);
+  const [dependentSchedule] = await db
+    .select({ id: schedules.id })
+    .from(schedules)
+    .where(eq(schedules.categoryId, id))
+    .limit(1);
+  if (dependentSchedule) {
+    throw conflict("Remove or change schedules that use this category before deleting it");
+  }
+
   const files = await db
     .select({ filePath: songs.filePath })
     .from(songs)

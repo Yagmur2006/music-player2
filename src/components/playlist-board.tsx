@@ -191,7 +191,7 @@ function SongRow({
         onClick={() => onSelect(song)}
         aria-label={en.playAria(song.title)}
         className={clsx(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition",
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-40",
           active
             ? "border-amber-400/50 bg-amber-500/20 text-amber-200"
             : "border-white/10 bg-black/30 text-white/60 group-hover:text-white",

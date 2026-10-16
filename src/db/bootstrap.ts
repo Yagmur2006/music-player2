@@ -1,6 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { asc, eq, sql } from "drizzle-orm";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { db } from "@/db";
 import {
   BOOTSTRAP_SQL,
@@ -52,6 +53,10 @@ let bootstrapPromise: Promise<void> | null = null;
 
 async function applySchema(): Promise<void> {
   await db.execute(BOOTSTRAP_SQL);
+}
+
+async function applyMigrations(): Promise<void> {
+  await migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
 }
 
 async function seedUsers(): Promise<void> {
@@ -134,6 +139,9 @@ async function runBootstrap(): Promise<void> {
   await db.execute(sql`SELECT pg_advisory_lock(918273645)`);
   try {
     await applySchema();
+    // The core schema predates migration tracking and is still bootstrapped here;
+    // incremental application features use standard, versioned Drizzle migrations.
+    await applyMigrations();
     await seedUsers();
     await seedConfig();
     await seedCategoriesAndSongs();

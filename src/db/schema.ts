@@ -6,8 +6,11 @@
 import {
   bigint,
   boolean,
+  check,
+  date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -16,6 +19,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+import type { PlaybackStatus, SongDTO } from "@/lib/types";
 
 export const userRoleEnum = pgEnum("user_role", ["ADMIN", "GUEST"]);
 export const songSourceEnum = pgEnum("song_source", ["WEB", "TELEGRAM", "SEED"]);
@@ -87,8 +91,77 @@ export const telegramWhitelist = pgTable(
   (table) => [uniqueIndex("telegram_whitelist_tid_key").on(table.telegramId)],
 );
 
+export const schedules = pgTable(
+  "schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    time: text("time").notNull(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "restrict" }),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("schedules_time_key").on(table.time),
+    index("schedules_enabled_time_idx").on(table.enabled, table.time),
+    check(
+      "schedules_time_format_check",
+      sql`${table.time} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`,
+    ),
+  ],
+);
+
+/** Durable dedupe key: a schedule time can be executed at most once per Tehran date. */
+export const scheduleExecutions = pgTable(
+  "schedule_executions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    executionDate: date("execution_date", { mode: "string" }).notNull(),
+    scheduleTime: text("schedule_time").notNull(),
+    scheduleId: uuid("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    executedAt: timestamp("executed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("schedule_executions_date_time_key").on(
+      table.executionDate,
+      table.scheduleTime,
+    ),
+    index("schedule_executions_schedule_idx").on(table.scheduleId),
+  ],
+);
+
+export const playbackState = pgTable(
+  "playback_state",
+  {
+    id: integer("id").primaryKey().default(1),
+    executionId: uuid("execution_id").references(() => scheduleExecutions.id, {
+      onDelete: "set null",
+    }),
+    scheduleId: uuid("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    categoryName: text("category_name"),
+    currentSongId: uuid("current_song_id").references(() => songs.id, { onDelete: "set null" }),
+    playlistSnapshot: jsonb("playlist_snapshot").$type<SongDTO[]>().notNull().default(sql`'[]'::jsonb`),
+    currentIndex: integer("current_index").notNull().default(0),
+    status: text("status").$type<PlaybackStatus>().notNull().default("WAITING"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("playback_state_singleton_check", sql`${table.id} = 1`),
+    check(
+      "playback_state_status_check",
+      sql`${table.status} in ('IDLE', 'PLAYING', 'WAITING')`,
+    ),
+  ],
+);
+
 export const categoriesRelations = relations(categories, ({ many }) => ({
   songs: many(songs),
+  schedules: many(schedules),
 }));
 
 export const songsRelations = relations(songs, ({ one }) => ({
@@ -103,6 +176,9 @@ export type CategoryRow = typeof categories.$inferSelect;
 export type SongRow = typeof songs.$inferSelect;
 export type SystemConfigRow = typeof systemConfig.$inferSelect;
 export type TelegramWhitelistRow = typeof telegramWhitelist.$inferSelect;
+export type ScheduleRow = typeof schedules.$inferSelect;
+export type ScheduleExecutionRow = typeof scheduleExecutions.$inferSelect;
+export type PlaybackStateRow = typeof playbackState.$inferSelect;
 
 /** Raw idempotent DDL, used by the runtime bootstrapper on fresh/self-hosted installs. */
 export const BOOTSTRAP_SQL = sql`
@@ -166,4 +242,5 @@ export const BOOTSTRAP_SQL = sql`
     "created_at" timestamptz NOT NULL DEFAULT now()
   );
   CREATE UNIQUE INDEX IF NOT EXISTS "telegram_whitelist_tid_key" ON "telegram_whitelist" ("telegram_id");
+
 `;

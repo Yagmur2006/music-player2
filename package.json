@@ -8,7 +8,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "bot": "tsx --env-file=.env.local src/server/telegram/launch.ts",
-    "seed:audio": "node scripts/generate-seed-audio.mjs"
+    "seed:audio": "node scripts/generate-seed-audio.mjs",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -20,6 +22,7 @@
     "lucide-react": "^1.28.0",
     "music-metadata": "^11.14.0",
     "next": "16.2.6",
+    "node-cron": "^4.6.0",
     "pg": "8.20.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",

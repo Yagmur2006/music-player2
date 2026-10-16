@@ -183,7 +183,7 @@ export function PlayerDock({
               type="button"
               onClick={onToggle}
               aria-label={state.isPlaying ? en.pause : en.play}
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500 text-cafe-950 shadow-lg shadow-amber-500/25 transition hover:bg-amber-400 active:scale-95"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500 text-cafe-950 shadow-lg shadow-amber-500/25 transition hover:bg-amber-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {state.isPlaying ? (
                 <Pause className="h-5 w-5" />
@@ -280,11 +280,13 @@ function ControlButton({
   label,
   onClick,
   active,
+  disabled = false,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -292,8 +294,9 @@ function ControlButton({
       onClick={onClick}
       aria-label={label}
       title={label}
+      disabled={disabled}
       className={clsx(
-        "rounded-xl p-2.5 transition hover:bg-white/8",
+        "rounded-xl p-2.5 transition hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-30",
         active ? "text-amber-300" : "text-white/60 hover:text-white",
       )}
     >

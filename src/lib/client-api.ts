@@ -3,6 +3,8 @@
 import type {
   BotRuntimeDTO,
   CategoryDTO,
+  PlaybackDTO,
+  ScheduleDTO,
   SessionUserDTO,
   SongDTO,
   SystemConfigDTO,
@@ -189,6 +191,34 @@ export const api = {
     request<SongDTO>(`/api/songs/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
+    }),
+
+  schedules: () => request<ScheduleDTO[]>("/api/schedules"),
+
+  createSchedule: (payload: { time: string; categoryId: string; enabled?: boolean }) =>
+    request<ScheduleDTO>("/api/schedules", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateSchedule: (
+    id: string,
+    payload: { time?: string; categoryId?: string; enabled?: boolean },
+  ) =>
+    request<ScheduleDTO>(`/api/schedules/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteSchedule: (id: string) =>
+    request<{ success: true }>(`/api/schedules/${id}`, { method: "DELETE" }),
+
+  playback: () => request<PlaybackDTO>("/api/playback"),
+
+  reportPlaybackProgress: (executionId: string, currentIndex: number) =>
+    request<{ success: true; updated: boolean }>("/api/playback", {
+      method: "PATCH",
+      body: JSON.stringify({ executionId, currentIndex }),
     }),
 
   config: () => request<SystemConfigDTO>("/api/config"),
