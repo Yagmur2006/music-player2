@@ -360,8 +360,9 @@ export function AdminPanel({
           dir="rtl"
           lang="fa"
           className="space-y-4 rounded-2xl border border-white/8 bg-black/25 p-4 text-right"
+          color="white"
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3" >
             <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
             <div>
               <h3 className="text-sm font-semibold text-cafe-ink">{scheduleFa.title}</h3>
@@ -378,7 +379,7 @@ export function AdminPanel({
           <div className="grid gap-3 sm:grid-cols-[0.8fr_1.2fr_auto] sm:items-end">
             <Field label={scheduleFa.time} rtl>
               <input
-                className={inputClass}
+                className={`${inputClass} [color-scheme:dark]`}
                 type="time"
                 step={60}
                 dir="ltr"
